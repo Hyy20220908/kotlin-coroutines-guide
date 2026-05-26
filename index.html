@@ -181,6 +181,29 @@ button,input{font:inherit}
 .card p,.card li{color:var(--muted);font-size:14px}
 .card ul,.card ol{margin:8px 0 0;padding-left:20px}
 .card li{margin:5px 0}
+.chapter{
+  max-width:980px;
+  color:var(--muted);
+  font-size:15px;
+}
+.chapter p{margin:12px 0}
+.chapter h3{margin:30px 0 10px;color:var(--text);font-size:20px}
+.chapter h4{margin:20px 0 8px;color:var(--text);font-size:16px}
+.chapter strong{color:var(--text)}
+.compare{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+  margin:16px 0;
+}
+.compare .card{background:rgba(255,255,255,.03)}
+.example-title{
+  display:block;
+  color:var(--accent);
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:8px;
+}
 .path{counter-reset:path}
 .path-step{
   position:relative;
@@ -372,7 +395,7 @@ td{color:var(--muted)}
   .nav a:hover,.nav a.active{border-left-color:var(--accent)}
   .hero h1{font-size:38px}
   .hero p{font-size:16px}
-  .grid.two,.grid.three,.split{grid-template-columns:1fr}
+  .grid.two,.grid.three,.split,.compare{grid-template-columns:1fr}
   .rubric{grid-template-columns:1fr}
   .rubric strong{border-bottom:0}
   .stats{grid-template-columns:1fr}
@@ -395,6 +418,7 @@ td{color:var(--muted)}
       <div class="nav-section">
         <span class="nav-kicker">Start</span>
         <a href="#roadmap">学习路线</a>
+        <a href="#why-coroutines">为什么需要协程</a>
         <a href="#mental-model">核心心智模型</a>
       </div>
       <div class="nav-section">
@@ -473,6 +497,68 @@ td{color:var(--muted)}
       </div>
     </section>
 
+    <section class="section" id="why-coroutines">
+      <h2>为什么需要协程：它解决的不是“少写线程”，而是异步控制权</h2>
+      <div class="chapter">
+        <p>学习协程之前，先不要急着背 <code>launch</code>、<code>async</code>、<code>withContext</code>。更重要的问题是：Android 开发为什么会需要一种新的异步模型？答案不是“线程太重”这么简单，而是传统异步代码有三个长期痛点：线程会阻塞，回调会割裂控制流，后台任务很容易脱离页面生命周期。</p>
+        <p>Android 的主线程负责绘制、事件分发和大部分 UI 状态更新。任何耗时操作，只要占住主线程太久，就会造成掉帧、卡顿甚至 ANR。于是我们把网络、数据库、文件读写放到后台线程。但线程 API 只解决了“在哪个线程执行”，没有解决“任务完成后如何回到原来的逻辑”“页面销毁后任务怎么办”“多个异步任务谁负责等待和取消”。协程真正补上的，就是这些控制权问题。</p>
+
+        <div class="compare">
+          <article class="card">
+            <span class="example-title">阻塞式写法：线程被占住</span>
+<pre><code class="language-kotlin">fun loadUserBlocking(): User {
+    Thread.sleep(1000)
+    return api.loadUser()
+}</code></pre>
+            <p>这段代码的执行模型很直接：调用线程停在这里，什么也不能做。放在主线程会卡 UI；放在线程池里会占住一个工作线程。</p>
+          </article>
+          <article class="card">
+            <span class="example-title">挂起式写法：逻辑暂停，线程释放</span>
+<pre><code class="language-kotlin">suspend fun loadUser(): User {
+    delay(1000)
+    return api.loadUser()
+}</code></pre>
+            <p>这段代码看起来仍然是顺序写法，但 <code>delay</code> 不会占住线程。协程保存“后面还要继续执行”的信息，当前线程可以去处理别的任务。</p>
+          </article>
+        </div>
+
+        <h3>协程不是把异步变同步，而是让异步代码保持顺序表达</h3>
+        <p>很多教程会说“协程让异步代码像同步代码一样写”。这句话有用，但容易误导。协程并没有把网络请求变成同步阻塞，它只是把“请求完成后继续执行什么”交给编译器和运行时管理。你看到的是顺序代码，底层仍然是挂起、回调、恢复、调度。</p>
+        <p>这就是为什么 <code>suspend</code> 函数既可以写得像普通函数，又不会阻塞线程。它把传统回调里的“下一步”变成了 Continuation。调用链不再被回调层层撕开，异常、取消、父子任务关系也可以被协程框架统一处理。</p>
+
+        <div class="compare">
+          <article class="card">
+            <span class="example-title">回调式：控制流被拆散</span>
+<pre><code class="language-kotlin">api.loadUser(id, object : Callback&lt;User&gt; {
+    override fun onSuccess(user: User) {
+        api.loadOrders(user.id, object : Callback&lt;List&lt;Order&gt;&gt; {
+            override fun onSuccess(orders: List&lt;Order&gt;) {
+                render(user, orders)
+            }
+        })
+    }
+})</code></pre>
+            <p>业务步骤被拆进多个回调，错误处理、取消、生命周期绑定都要额外设计。需求一复杂，很容易形成“回调树”。</p>
+          </article>
+          <article class="card">
+            <span class="example-title">协程式：业务步骤保持线性</span>
+<pre><code class="language-kotlin">viewModelScope.launch {
+    val user = repository.loadUser(id)
+    val orders = repository.loadOrders(user.id)
+    _state.value = UiState.Success(user, orders)
+}</code></pre>
+            <p>代码表达的是业务顺序：先用户，后订单，再更新状态。挂起和恢复由协程处理，生命周期由 <code>viewModelScope</code> 兜住。</p>
+          </article>
+        </div>
+
+        <h3>把协程拆成三层理解</h3>
+        <p><strong>第一层是语法层。</strong><code>suspend</code> 让函数可以挂起，<code>launch</code> 和 <code>async</code> 让你启动新的协程，<code>Flow</code> 让你描述一串异步数据。</p>
+        <p><strong>第二层是运行时层。</strong>编译器生成状态机，Continuation 表示恢复点，Dispatcher 决定恢复在哪个线程，Job 维护任务状态、父子关系和取消传播。</p>
+        <p><strong>第三层是架构层。</strong>在 Android 中，协程必须和 ViewModel、Lifecycle、Repository、UI 状态管理结合。否则你只是把回调换成了 <code>launch</code>，并没有真正解决生命周期和异常边界。</p>
+        <div class="tip"><strong>读后判断：</strong>如果你能解释“为什么 delay 不阻塞线程”“为什么 viewModelScope 能避免页面任务泄漏”“为什么协程代码看起来顺序但底层仍是回调恢复”，后面的状态机、Job 树和 Flow 才会真正串起来。</div>
+      </div>
+    </section>
+
     <section class="section" id="mental-model">
       <h2>核心心智模型：协程不是线程，是一段可恢复的计算</h2>
       <p class="lead">一句话抓住本质：协程把“回调后继续做什么”包装成 Continuation，并交给调度器、Job 树和上下文统一管理。</p>
@@ -508,6 +594,21 @@ td{color:var(--muted)}
     <section class="section" id="suspend">
       <h2>suspend 与状态机：协程底层骨架</h2>
       <p class="lead"><code>suspend</code> 最容易被误解。它不代表“这个函数自动开线程”，也不代表“这个函数一定异步”。它只代表：这个函数可以在某个点暂停，并把后续执行封装成 Continuation。</p>
+      <div class="chapter">
+        <p>把 <code>suspend</code> 理解成“函数可以被切成多段执行”会更准确。普通函数一旦开始执行，要么一路跑到 return，要么抛异常退出。挂起函数不同：它可以先执行前半段，遇到挂起点时把当前状态保存起来，然后立刻返回一个特殊标记。等异步操作完成后，再从保存的位置继续执行后半段。</p>
+        <p>这个过程最容易混淆的地方是“暂停”的对象。协程暂停的不是线程，而是这一段计算逻辑。线程只是执行代码的工人；当协程挂起时，工人不需要站在原地等，可以去执行别的任务。等结果来了，协程运行时再安排某个合适的线程来恢复这段计算。</p>
+        <h3>一个挂起函数会被拆成哪些东西</h3>
+<pre><code class="language-kotlin">suspend fun loadProfile(id: Long): Profile {
+    val user = api.user(id)       // 挂起点 1
+    val score = api.score(user)   // 挂起点 2
+    return Profile(user, score)
+}</code></pre>
+        <p>编译器看到两个挂起点后，会把函数拆成三个执行片段：调用 <code>api.user</code> 之前、<code>api.user</code> 恢复之后到 <code>api.score</code> 之前、<code>api.score</code> 恢复之后到 return。为了知道下一次应该从哪里继续，它会生成类似 <code>label</code> 的状态字段。</p>
+        <p>同时，局部变量也不能简单放在普通栈帧里。因为挂起时当前函数已经返回了，原来的调用栈不再持续占用线程栈。像上面的 <code>user</code>，在第二个挂起点之后还要用，所以它会被提升到状态机对象的字段里。恢复时，状态机从字段中取回这些局部变量，继续执行后面的代码。</p>
+        <h3>为什么返回值会变成 Any?</h3>
+        <p>挂起函数编译后要表达两种完全不同的结果：如果没有挂起，它可以直接返回真实结果；如果挂起了，它要告诉调用方“我先返回，后续通过 Continuation 恢复”。所以编译后的函数通常会有一个宽泛的返回类型：正常完成时返回业务值，挂起时返回 <code>COROUTINE_SUSPENDED</code>。</p>
+        <div class="note"><strong>关键点：</strong><code>COROUTINE_SUSPENDED</code> 不是异常，也不是失败。它只是协程运行时内部使用的一个信号：当前函数没有同步完成，请不要继续当成普通返回值处理。</div>
+      </div>
       <div class="split">
         <div>
           <h3>编译前后长什么样</h3>
@@ -625,6 +726,15 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
     <section class="section" id="structured">
       <h2>结构化并发与取消：Job 树决定生死</h2>
       <p class="lead">结构化并发解决的是“谁负责等待、谁负责取消、异常往哪儿传”的问题。没有它，异步任务会变成到处泄漏的后台工作。</p>
+      <div class="chapter">
+        <p>如果只看 <code>launch</code>，协程很像“启动一个后台任务”。但真正让协程适合大型 Android 项目的，是结构化并发。它要求新任务必须挂在一个明确的作用域下面，作用域结束时，子任务也必须完成或取消。这样你才能回答三个工程问题：页面退出后任务还在不在？一个子任务失败会不会影响其他任务？调用方什么时候能确定所有异步工作都结束了？</p>
+        <p>在没有结构化并发的异步模型里，任务经常像断线风筝一样飞出去。一个网络请求可能在页面销毁后才回调，一个后台任务可能静默失败，一个父流程可能已经结束但子任务还在跑。协程的 Job 树就是为了把这些关系显式化：每个协程都有自己的 Job，子协程挂到父 Job 下，父子之间有明确的完成、取消和异常传播规则。</p>
+        <h3>普通 Job 的默认语义：一起成功，或者一起失败</h3>
+        <p>在普通 <code>coroutineScope</code> 中，多个子任务通常表达一个整体工作。比如加载一个详情页必须同时拿到商品、价格和库存，其中任何一个失败都意味着这个整体结果不可用。这时一个子协程抛异常，父协程会进入取消流程，其他兄弟协程也会被取消。这样可以避免“整体已经失败，但某些子任务还在后台继续跑”的状态。</p>
+        <h3>Supervisor 的语义：兄弟任务互不拖累</h3>
+        <p>但不是所有页面都要求整体失败。首页模块、推荐流、广告、未读数往往可以部分成功。这个时候用普通 Job 会过于激进：广告失败不应该取消用户信息。<code>SupervisorJob</code> 和 <code>supervisorScope</code> 提供的就是“子失败不向上传播取消父”的边界。它不是吞异常，而是改变失败传播策略；每个子任务仍然需要自己处理结果或错误。</p>
+        <div class="warn"><strong>容易误解：</strong>Supervisor 不是“异常安全模式”。它只是隔离子任务失败，未处理异常仍然要被处理。实际项目里经常配合 <code>runCatching</code>、局部 try/catch 或统一错误映射。</div>
+      </div>
       <div class="diagram">
         <svg viewBox="0 0 820 360" role="img" aria-label="Job 树取消传播图">
           <defs><marker id="arrowB" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1 L9 5 L1 9 Z" fill="#bd5b42"/></marker></defs>
@@ -754,6 +864,17 @@ try {
     <section class="section" id="flow">
       <h2>Flow：冷流、操作符链和 flowOn</h2>
       <p class="lead">Flow 是协程世界里的异步数据流。它的难点不是 API 名字，而是“谁触发生产、谁在哪个线程执行、异常从哪里被 catch”。</p>
+      <div class="chapter">
+        <p>Flow 最适合用“管道”来理解，但这个管道有一个非常重要的特性：默认情况下，它不是提前运行的后台任务，而是一段等待被收集的声明。你写下 <code>flow { emit(...) }</code> 时，并没有立刻请求网络，也没有立刻发送数据。只有当某个协程调用 <code>collect</code>，上游 block 才开始执行。</p>
+        <p>这就是“冷流”的本质。冷流像一个函数，每次调用都会重新执行；热流像一个持续存在的状态源或事件源，是否有人订阅并不决定它是否存在。理解这一点，才能正确区分 Repository 返回 <code>Flow</code>、ViewModel 暴露 <code>StateFlow</code>、UI 收集状态这几层职责。</p>
+        <h3>Flow 操作符不是列表转换，而是 collector 包装</h3>
+        <p>很多人会把 Flow 的 <code>map</code>、<code>filter</code> 理解成集合操作符。语法上很像，但运行方式不同。集合是已经在内存里的数据；Flow 是一个异步发射过程。每个操作符会返回一个新的 Flow，它内部包装了下游 collector。等最终 <code>collect</code> 被调用时，这些包装才串成一条链。</p>
+        <p>所以数据方向和调用方向是相反的：<code>collect</code> 调用会从末端一路向上游建立链；<code>emit</code> 发生时，值再从上游一路经过 map、filter、catch、onEach 到达最终 collect。默认没有 buffer 时，上一个值要等下游处理完成，下一个值才会继续发射。</p>
+        <h3>flowOn 为什么只影响上游</h3>
+        <p><code>flowOn</code> 不是“从这一行开始切线程”，而是“把我上游这段 Flow 放到指定上下文执行”。下游 collect 仍然运行在收集它的协程上下文里。这个设计让线程边界非常清晰：数据生产和转换可以在 IO 或 Default，UI 渲染仍然回到 Main。</p>
+        <p>当上下游上下文不同，Flow 通常需要在中间建立一个边界：上游在一个协程里发射，下游在另一个协程里接收，中间通过 channel 或类似机制传递值。这也是为什么 <code>flowOn</code> 会影响取消、异常和缓冲行为，不能把它当成普通函数调用里的 <code>withContext</code>。</p>
+        <div class="tip"><strong>读后判断：</strong>看到一条 Flow 链时，先标出三个边界：冷流从哪里开始执行，<code>flowOn</code> 影响到哪里，<code>catch</code> 能捕获哪一段。大多数 Flow bug 都能从这三件事里定位。</div>
+      </div>
       <div class="grid two">
         <div class="card">
           <h3>Cold Flow</h3>
