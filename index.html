@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="description" content="面向 Android 开发者的 Kotlin 协程深度指南：从 suspend 状态机到 Flow、结构化并发、异常处理、性能优化与大厂面试题。">
+<title>Kotlin 协程深度指南 | Android 实战与面试</title>
+<style>
+:root{
+  --bg:#09111f;
+  --bg-2:#0f1b2d;
+  --surface:#121f33;
+  --surface-2:#172941;
+  --line:#28415f;
+  --line-soft:#203650;
+  --text:#eef6ff;
+  --muted:#9eb2ca;
+  --subtle:#6f849d;
+  --accent:#65d7c4;
+  --accent-2:#7aa7ff;
+  --warn:#ffb35c;
+  --danger:#ff776d;
+  --ok:#7ee787;
+  --code:#07101d;
+  --shadow:0 24px 80px rgba(0,0,0,.32);
+  --side:292px;
+  --radius:8px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 12% -10%,rgba(101,215,196,.18),transparent 34rem),
+    radial-gradient(circle at 90% 0,rgba(122,167,255,.18),transparent 32rem),
+    linear-gradient(180deg,#08101e 0,#0b1424 38rem,#09111f 100%);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+  line-height:1.75;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+.layout{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100vh}
+.sidebar{
+  position:sticky;
+  top:0;
+  height:100vh;
+  overflow:auto;
+  padding:22px 16px;
+  background:rgba(9,17,31,.86);
+  border-right:1px solid var(--line-soft);
+  backdrop-filter:blur(18px);
+}
+.brand{display:flex;align-items:center;gap:10px;margin:0 0 18px}
+.brand-mark{
+  width:34px;height:34px;border-radius:8px;
+  display:grid;place-items:center;
+  color:#03151a;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  box-shadow:0 12px 30px rgba(101,215,196,.18);
+}
+.brand-title{font-size:15px;font-weight:800;letter-spacing:.2px;line-height:1.35}
+.brand-title span{display:block;color:var(--muted);font-size:11px;font-weight:600}
+.search{
+  width:100%;
+  padding:9px 10px;
+  color:var(--text);
+  background:#07101d;
+  border:1px solid var(--line);
+  border-radius:8px;
+  outline:none;
+}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(101,215,196,.14)}
+.nav{margin-top:18px}
+.nav-section{margin:14px 0}
+.nav-kicker{
+  display:block;
+  padding:0 8px 6px;
+  color:var(--subtle);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.nav a{
+  display:block;
+  padding:6px 8px 6px 11px;
+  color:var(--muted);
+  font-size:12px;
+  border-left:2px solid transparent;
+  border-radius:0 6px 6px 0;
+}
+.nav a:hover,.nav a.active{color:var(--text);background:rgba(101,215,196,.08);border-left-color:var(--accent)}
+.content{min-width:0}
+.hero>*,.grid>*,.split>*,.card{min-width:0}
+.hero{
+  min-height:92vh;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(340px,520px);
+  align-items:center;
+  gap:54px;
+  padding:64px clamp(24px,5vw,72px) 44px;
+  border-bottom:1px solid var(--line-soft);
+}
+.hero h1{
+  max-width:780px;
+  margin:0;
+  font-size:clamp(38px,7vw,82px);
+  line-height:1.02;
+  letter-spacing:0;
+}
+.hero p{max-width:690px;margin:22px 0 0;color:var(--muted);font-size:18px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:42px;
+  padding:10px 16px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  color:var(--text);
+  background:rgba(18,31,51,.78);
+  cursor:pointer;
+}
+.btn.primary{color:#03151a;background:linear-gradient(135deg,var(--accent),#99eadf);border-color:transparent;font-weight:800}
+.btn:hover{transform:translateY(-1px)}
+.hero-panel{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  background:linear-gradient(180deg,rgba(23,41,65,.95),rgba(9,17,31,.98));
+  box-shadow:var(--shadow);
+}
+.panel-top{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid var(--line-soft);background:rgba(255,255,255,.03)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--danger)}
+.dot:nth-child(2){background:var(--warn)}
+.dot:nth-child(3){background:var(--ok)}
+.flow-map{padding:22px}
+.flow-node{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  gap:12px;
+  padding:12px;
+  margin:0 0 12px;
+  border:1px solid var(--line-soft);
+  border-radius:8px;
+  background:rgba(255,255,255,.03);
+}
+.flow-node strong{display:block;font-size:13px}
+.flow-node span{display:block;color:var(--muted);font-size:12px;line-height:1.5}
+.flow-icon{
+  width:42px;height:42px;border-radius:8px;
+  display:grid;place-items:center;
+  background:rgba(101,215,196,.13);
+  color:var(--accent);
+  font-weight:900;
+}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line-soft)}
+.stat{padding:15px 16px;border-right:1px solid var(--line-soft)}
+.stat:last-child{border-right:0}
+.stat strong{display:block;font-size:20px}
+.stat span{color:var(--subtle);font-size:12px}
+.section{
+  padding:58px clamp(20px,5vw,72px);
+  border-bottom:1px solid var(--line-soft);
+}
+.section h2{margin:0 0 12px;font-size:clamp(26px,4vw,42px);line-height:1.12;letter-spacing:0}
+.section>p.lead{max-width:880px;margin:0 0 26px;color:var(--muted);font-size:16px}
+.grid{display:grid;gap:16px}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:linear-gradient(180deg,rgba(23,41,65,.84),rgba(13,25,42,.84));
+  padding:18px;
+}
+.card h3{margin:0 0 9px;font-size:18px;line-height:1.35}
+.card h4{margin:18px 0 8px;color:var(--text);font-size:15px}
+.card p,.card li{color:var(--muted);font-size:14px}
+.card ul,.card ol{margin:8px 0 0;padding-left:20px}
+.card li{margin:5px 0}
+.path{counter-reset:path}
+.path-step{
+  position:relative;
+  padding-left:56px;
+  margin:0 0 18px;
+}
+.path-step:before{
+  counter-increment:path;
+  content:counter(path);
+  position:absolute;left:0;top:0;
+  width:36px;height:36px;border-radius:8px;
+  display:grid;place-items:center;
+  color:#03151a;font-weight:900;
+  background:var(--accent);
+}
+.path-step:after{
+  content:"";
+  position:absolute;left:17px;top:42px;bottom:-18px;
+  width:1px;background:var(--line);
+}
+.path-step:last-child:after{display:none}
+.path-step h3{margin:0 0 4px;font-size:17px}
+.path-step p{margin:0;color:var(--muted);font-size:14px}
+.note,.warn,.tip{
+  margin:16px 0;
+  padding:13px 15px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.035);
+  color:var(--muted);
+  font-size:14px;
+}
+.note{border-left:3px solid var(--accent-2)}
+.warn{border-left:3px solid var(--warn)}
+.tip{border-left:3px solid var(--accent)}
+.note strong,.warn strong,.tip strong{color:var(--text)}
+pre{
+  margin:14px 0;
+  padding:16px;
+  overflow:auto;
+  max-width:100%;
+  background:var(--code);
+  border:1px solid var(--line);
+  border-radius:8px;
+  color:#d7e8ff;
+  line-height:1.6;
+}
+code,kbd{font-family:"JetBrains Mono","Fira Code",Consolas,monospace}
+pre code{font-size:13px}
+p code,li code,td code{
+  padding:2px 5px;
+  color:#c9fff6;
+  background:#07101d;
+  border:1px solid var(--line-soft);
+  border-radius:5px;
+  font-size:.92em;
+}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{padding:10px 12px;border:1px solid var(--line);vertical-align:top}
+th{color:var(--text);background:rgba(255,255,255,.05);text-align:left}
+td{color:var(--muted)}
+.diagram{
+  margin:18px 0;
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#f5fbff;
+  overflow:auto;
+}
+.diagram svg{display:block;min-width:680px;width:100%;height:auto}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:5px 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  color:var(--muted);
+  background:rgba(255,255,255,.035);
+  font-size:12px;
+}
+.qa{
+  border:1px solid var(--line);
+  border-radius:8px;
+  margin:10px 0;
+  overflow:hidden;
+  background:rgba(255,255,255,.025);
+}
+.qa button{
+  width:100%;
+  display:flex;justify-content:space-between;gap:12px;
+  padding:13px 15px;
+  text-align:left;
+  border:0;
+  color:var(--text);
+  background:transparent;
+  cursor:pointer;
+  font-weight:750;
+}
+.qa button:after{content:"+";color:var(--accent);font-size:18px;line-height:1}
+.qa.open button:after{content:"-"}
+.qa .answer{display:none;padding:0 15px 15px;color:var(--muted);font-size:14px}
+.qa.open .answer{display:block}
+.split{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(300px,420px);
+  gap:20px;
+  align-items:start;
+}
+.checklist{list-style:none!important;padding-left:0!important}
+.checklist li{position:relative;padding-left:26px}
+.checklist li:before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:900}
+.footer{padding:28px clamp(20px,5vw,72px);color:var(--subtle);font-size:13px}
+.top{
+  position:fixed;
+  right:22px;
+  bottom:22px;
+  width:42px;height:42px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:var(--surface);
+  color:var(--text);
+  display:none;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+}
+.top.show{display:block}
+.highlight{outline:2px solid var(--accent);background:rgba(101,215,196,.08)}
+@media(max-width:1080px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto}
+  .nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px}
+  .hero{grid-template-columns:1fr;min-height:auto;padding-top:42px}
+}
+@media(max-width:760px){
+  .layout,.content{max-width:100vw;overflow-x:hidden}
+  .hero,.section{padding-left:18px;padding-right:18px}
+  .sidebar{padding:14px 16px 10px}
+  .brand{margin-bottom:12px}
+  .search{padding:8px 10px}
+  .nav{
+    display:flex;
+    gap:8px;
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    margin-top:10px;
+    padding-bottom:6px;
+    scrollbar-width:none;
+  }
+  .nav::-webkit-scrollbar{display:none}
+  .nav-section{display:flex;gap:8px;margin:0;flex:0 0 auto}
+  .nav-kicker{display:none}
+  .nav a{
+    white-space:nowrap;
+    border:1px solid var(--line);
+    border-left:1px solid var(--line);
+    border-radius:999px;
+    padding:5px 10px;
+    background:rgba(255,255,255,.025);
+  }
+  .nav a:hover,.nav a.active{border-left-color:var(--accent)}
+  .hero h1{font-size:38px}
+  .hero p{font-size:16px}
+  .grid.two,.grid.three,.split{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr}
+  .stat{border-right:0;border-bottom:1px solid var(--line-soft)}
+  .diagram{padding:12px}
+  .diagram svg{min-width:620px}
+  pre{font-size:12px;white-space:pre}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Kt</div>
+      <div class="brand-title">Kotlin 协程深度指南 <span>Android 实战与面试路线</span></div>
+    </div>
+    <input class="search" id="search" placeholder="搜索 suspend / Flow / 面试题">
+    <nav class="nav" aria-label="页面导航">
+      <div class="nav-section">
+        <span class="nav-kicker">Start</span>
+        <a href="#roadmap">学习路线</a>
+        <a href="#mental-model">核心心智模型</a>
+      </div>
+      <div class="nav-section">
+        <span class="nav-kicker">Core</span>
+        <a href="#suspend">suspend 与状态机</a>
+        <a href="#context">Scope / Context / Dispatcher</a>
+        <a href="#structured">结构化并发与取消</a>
+        <a href="#exceptions">异常处理体系</a>
+      </div>
+      <div class="nav-section">
+        <span class="nav-kicker">Flow</span>
+        <a href="#flow">Flow 冷流与热流</a>
+        <a href="#stateflow">StateFlow / SharedFlow</a>
+      </div>
+      <div class="nav-section">
+        <span class="nav-kicker">Android</span>
+        <a href="#android">Android 落地架构</a>
+        <a href="#testing">测试与调试</a>
+        <a href="#performance">性能与反模式</a>
+      </div>
+      <div class="nav-section">
+        <span class="nav-kicker">Interview</span>
+        <a href="#interview">大厂面试题库</a>
+        <a href="#deploy">Railway 部署</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <section class="hero" id="top">
+      <div>
+        <h1>Kotlin 协程，从会用到讲透。</h1>
+        <p>这不是 API 速查表，而是一条面向 Android 开发者的完整学习路径：先建立非阻塞、状态机、Job 树、Dispatcher、Flow 的底层模型，再回到 ViewModel、Repository、生命周期、测试、性能和大厂面试。</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#roadmap">开始学习</a>
+          <a class="btn" href="#interview">直达面试题</a>
+          <a class="btn" href="#android">看 Android 实战</a>
+        </div>
+        <div class="pill-row" aria-label="覆盖主题">
+          <span class="pill">suspend 状态机</span>
+          <span class="pill">结构化并发</span>
+          <span class="pill">Flow / StateFlow</span>
+          <span class="pill">viewModelScope</span>
+          <span class="pill">异常与取消</span>
+          <span class="pill">面试高频追问</span>
+        </div>
+      </div>
+      <div class="hero-panel" aria-label="协程执行链路示意">
+        <div class="panel-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="flow-map">
+          <div class="flow-node"><div class="flow-icon">1</div><div><strong>调用 suspend 函数</strong><span>编译器额外传入 Continuation，函数返回 Any?</span></div></div>
+          <div class="flow-node"><div class="flow-icon">2</div><div><strong>遇到挂起点</strong><span>保存 label 与局部变量，返回 COROUTINE_SUSPENDED</span></div></div>
+          <div class="flow-node"><div class="flow-icon">3</div><div><strong>线程被释放</strong><span>不是阻塞等待，而是把后续逻辑交给回调恢复</span></div></div>
+          <div class="flow-node"><div class="flow-icon">4</div><div><strong>resumeWith 恢复</strong><span>Dispatcher 决定在哪个线程继续执行状态机</span></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong>10</strong><span>核心章节</span></div>
+          <div class="stat"><strong>60+</strong><span>面试追问点</span></div>
+          <div class="stat"><strong>1</strong><span>可部署静态站</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="roadmap">
+      <h2>学习路线：先会用，再讲透，最后能排坑</h2>
+      <p class="lead">很多人学协程会卡在两个极端：只背 API，遇到异常和取消就崩；一上来啃源码，缺少 Android 使用场景。建议按下面顺序推进。</p>
+      <div class="path">
+        <div class="path-step"><h3>第一层：把协程当成“可取消的异步任务”</h3><p>掌握 <code>launch</code>、<code>async/await</code>、<code>withContext</code>、<code>viewModelScope</code>，能把网络、数据库、文件 IO 从主线程挪出去。</p></div>
+        <div class="path-step"><h3>第二层：理解 suspend 的真实形态</h3><p><code>suspend</code> 不创建线程，不等于异步。它只是允许函数在挂起点保存现场、返回、稍后恢复。</p></div>
+        <div class="path-step"><h3>第三层：用 Job 树解释生命周期</h3><p>父取消子、子异常影响父、兄弟协程如何被级联取消，这些都由结构化并发和 Job 状态机控制。</p></div>
+        <div class="path-step"><h3>第四层：把 Flow 当成数据管道</h3><p>冷流负责声明数据生产逻辑，热流负责状态共享。理解 <code>flowOn</code>、<code>catch</code>、<code>stateIn</code> 才能写稳定 UI。</p></div>
+        <div class="path-step"><h3>第五层：面向 Android 架构落地</h3><p>ViewModel 暴露状态，Repository 暴露 suspend/Flow，UI 按生命周期收集，测试里控制 Dispatcher 和虚拟时间。</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="mental-model">
+      <h2>核心心智模型：协程不是线程，是一段可恢复的计算</h2>
+      <p class="lead">一句话抓住本质：协程把“回调后继续做什么”包装成 Continuation，并交给调度器、Job 树和上下文统一管理。</p>
+      <div class="grid three">
+        <article class="card">
+          <h3>suspend</h3>
+          <p>函数可能挂起。挂起时不占用线程；恢复时从上次保存的 label 继续执行。</p>
+        </article>
+        <article class="card">
+          <h3>CoroutineScope</h3>
+          <p>协程的生命周期边界。Android 里常见的 <code>viewModelScope</code>、<code>lifecycleScope</code> 本质都是带 Job 的 Scope。</p>
+        </article>
+        <article class="card">
+          <h3>CoroutineContext</h3>
+          <p>协程配置集合，常见元素包括 <code>Job</code>、<code>Dispatcher</code>、<code>CoroutineName</code> 和 <code>CoroutineExceptionHandler</code>。</p>
+        </article>
+        <article class="card">
+          <h3>Dispatcher</h3>
+          <p>决定协程恢复时跑在哪个线程或线程池。它不是执行逻辑本身，而是调度策略。</p>
+        </article>
+        <article class="card">
+          <h3>Job</h3>
+          <p>代表一个协程任务，维护状态、父子关系、取消、完成和异常传播。</p>
+        </article>
+        <article class="card">
+          <h3>Flow</h3>
+          <p>异步数据流。冷流在 collect 时启动，热流独立存在并共享最新值或事件。</p>
+        </article>
+      </div>
+      <div class="note"><strong>面试表达模板：</strong>协程是编译器、标准库和调度器配合实现的轻量级并发模型。编译器把 suspend 函数改写为状态机，标准库用 Continuation 表示恢复点，用 Job 维护结构化并发，用 Dispatcher 决定恢复线程。</div>
+    </section>
+
+    <section class="section" id="suspend">
+      <h2>suspend 与状态机：协程底层骨架</h2>
+      <p class="lead"><code>suspend</code> 最容易被误解。它不代表“这个函数自动开线程”，也不代表“这个函数一定异步”。它只代表：这个函数可以在某个点暂停，并把后续执行封装成 Continuation。</p>
+      <div class="split">
+        <div>
+          <h3>编译前后长什么样</h3>
+<pre><code class="language-kotlin">// 你写的代码
+suspend fun loadUser(id: Long): User {
+    delay(300)
+    return api.user(id)
+}
+
+// 编译后的心智模型，不是精确源码
+fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
+    // 正常完成：返回 User
+    // 发生挂起：返回 COROUTINE_SUSPENDED
+}</code></pre>
+          <p><code>Continuation</code> 只有两个关键点：它携带 <code>CoroutineContext</code>，并通过 <code>resumeWith(Result&lt;T&gt;)</code> 恢复调用方。</p>
+<pre><code class="language-kotlin">public interface Continuation&lt;in T&gt; {
+    public val context: CoroutineContext
+    public fun resumeWith(result: Result&lt;T&gt;)
+}</code></pre>
+        </div>
+        <aside class="card">
+          <h3>状态机的执行顺序</h3>
+          <ol>
+            <li>首次进入函数，<code>label = 0</code>。</li>
+            <li>遇到 <code>delay</code>、网络请求等挂起点。</li>
+            <li>保存下一次恢复位置：<code>label = 1</code>。</li>
+            <li>把当前 Continuation 注册给异步操作。</li>
+            <li>返回 <code>COROUTINE_SUSPENDED</code>，当前线程继续做别的事。</li>
+            <li>异步操作完成后调用 <code>resumeWith</code>。</li>
+            <li>状态机从 <code>label = 1</code> 继续执行。</li>
+          </ol>
+        </aside>
+      </div>
+      <div class="diagram">
+        <svg viewBox="0 0 820 300" role="img" aria-label="suspend 状态机流程图">
+          <defs>
+            <marker id="arrowA" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1 L9 5 L1 9 Z" fill="#2b6fba"/></marker>
+          </defs>
+          <rect x="30" y="48" width="150" height="68" rx="8" fill="#dff8f4" stroke="#179b89"/>
+          <text x="105" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#06463d">label = 0</text>
+          <text x="105" y="100" text-anchor="middle" font-size="12" fill="#0f6258">进入函数</text>
+          <rect x="230" y="48" width="160" height="68" rx="8" fill="#e7f0ff" stroke="#2b6fba"/>
+          <text x="310" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#123f74">挂起点</text>
+          <text x="310" y="100" text-anchor="middle" font-size="12" fill="#2b5d91">保存恢复位置</text>
+          <rect x="440" y="48" width="170" height="68" rx="8" fill="#fff2dc" stroke="#bd7429"/>
+          <text x="525" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#71400d">返回特殊标记</text>
+          <text x="525" y="100" text-anchor="middle" font-size="12" fill="#8d5818">线程不阻塞</text>
+          <rect x="660" y="48" width="130" height="68" rx="8" fill="#f0e8ff" stroke="#6b52c8"/>
+          <text x="725" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#3f288f">resumeWith</text>
+          <text x="725" y="100" text-anchor="middle" font-size="12" fill="#5d45ad">恢复执行</text>
+          <path d="M180 82 H230" stroke="#2b6fba" stroke-width="2" marker-end="url(#arrowA)"/>
+          <path d="M390 82 H440" stroke="#2b6fba" stroke-width="2" marker-end="url(#arrowA)"/>
+          <path d="M610 82 H660" stroke="#2b6fba" stroke-width="2" marker-end="url(#arrowA)"/>
+          <path d="M725 116 C725 190 105 190 105 116" fill="none" stroke="#6b52c8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowA)"/>
+          <text x="414" y="221" text-anchor="middle" font-size="14" fill="#3c526a">恢复后不是重新调用整个函数，而是从保存的 label 继续</text>
+        </svg>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>常见误区</h3>
+          <ul>
+            <li><code>suspend</code> 函数不会自动切线程，切线程靠 <code>withContext</code> 或调用方的 Dispatcher。</li>
+            <li><code>suspend</code> 函数可以同步返回，也可以挂起后返回。</li>
+            <li>挂起不是阻塞，阻塞会占住线程，挂起会释放线程。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>面试追问</h3>
+          <ul>
+            <li>为什么编译后返回值是 <code>Any?</code>？</li>
+            <li><code>COROUTINE_SUSPENDED</code> 是异常吗？</li>
+            <li>局部变量在挂起前后如何保存？</li>
+            <li>Continuation 和回调有什么关系？</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="context">
+      <h2>Scope / Context / Dispatcher：协程的控制面</h2>
+      <p class="lead">协程 API 看起来很多，但控制面可以压缩成三句话：Scope 管生命周期，Context 装配置，Dispatcher 管线程调度。</p>
+      <table>
+        <thead><tr><th>概念</th><th>负责什么</th><th>Android 常见例子</th><th>面试关键词</th></tr></thead>
+        <tbody>
+          <tr><td><code>CoroutineScope</code></td><td>提供协程启动边界，必须有 <code>coroutineContext</code></td><td><code>viewModelScope</code>、<code>lifecycleScope</code></td><td>生命周期、结构化并发</td></tr>
+          <tr><td><code>CoroutineContext</code></td><td>不可变配置集合，通过 Key 查询元素</td><td><code>SupervisorJob() + Dispatchers.Main</code></td><td>组合、覆盖、上下文元素</td></tr>
+          <tr><td><code>CoroutineDispatcher</code></td><td>决定协程恢复在哪个线程执行</td><td><code>Main</code>、<code>IO</code>、<code>Default</code></td><td>ContinuationInterceptor</td></tr>
+        </tbody>
+      </table>
+      <div class="grid three">
+        <article class="card">
+          <h3>Dispatchers.Main</h3>
+          <p>主线程，更新 UI。Android 中由主线程 Looper 支撑。不要在 Main 上执行阻塞 IO 或大量 CPU 计算。</p>
+        </article>
+        <article class="card">
+          <h3>Dispatchers.IO</h3>
+          <p>面向阻塞 IO 的共享线程池。适合文件、数据库、阻塞式网络 SDK。不要把 CPU 密集任务长期丢到 IO。</p>
+        </article>
+        <article class="card">
+          <h3>Dispatchers.Default</h3>
+          <p>面向 CPU 密集任务，线程数通常与 CPU 核心相关。适合排序、解析、加密、图片处理等计算。</p>
+        </article>
+      </div>
+<pre><code class="language-kotlin">class UserRepository(
+    private val api: UserApi,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    suspend fun loadUser(id: Long): User = withContext(ioDispatcher) {
+        api.fetchUser(id)
+    }
+}</code></pre>
+      <div class="tip"><strong>架构建议：</strong>Repository 或 UseCase 内部自己切到合适 Dispatcher，让调用方不用关心底层是网络、数据库还是 CPU 计算。为了测试可控，Dispatcher 应该可注入。</div>
+    </section>
+
+    <section class="section" id="structured">
+      <h2>结构化并发与取消：Job 树决定生死</h2>
+      <p class="lead">结构化并发解决的是“谁负责等待、谁负责取消、异常往哪儿传”的问题。没有它，异步任务会变成到处泄漏的后台工作。</p>
+      <div class="diagram">
+        <svg viewBox="0 0 820 360" role="img" aria-label="Job 树取消传播图">
+          <defs><marker id="arrowB" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1 L9 5 L1 9 Z" fill="#bd5b42"/></marker></defs>
+          <rect x="310" y="24" width="200" height="62" rx="8" fill="#e9f6ff" stroke="#2b6fba"/>
+          <text x="410" y="58" text-anchor="middle" font-size="16" font-weight="700" fill="#174573">Parent Job</text>
+          <rect x="70" y="150" width="180" height="62" rx="8" fill="#dff8f4" stroke="#179b89"/>
+          <text x="160" y="184" text-anchor="middle" font-size="15" font-weight="700" fill="#06463d">Child A</text>
+          <rect x="320" y="150" width="180" height="62" rx="8" fill="#fff2dc" stroke="#bd7429"/>
+          <text x="410" y="184" text-anchor="middle" font-size="15" font-weight="700" fill="#71400d">Child B throws</text>
+          <rect x="570" y="150" width="180" height="62" rx="8" fill="#dff8f4" stroke="#179b89"/>
+          <text x="660" y="184" text-anchor="middle" font-size="15" font-weight="700" fill="#06463d">Child C</text>
+          <path d="M410 86 V126 H160 V150" fill="none" stroke="#2b6fba" stroke-width="2"/>
+          <path d="M410 86 V150" fill="none" stroke="#2b6fba" stroke-width="2"/>
+          <path d="M410 126 H660 V150" fill="none" stroke="#2b6fba" stroke-width="2"/>
+          <path d="M410 150 C410 120 410 110 410 86" fill="none" stroke="#bd5b42" stroke-width="2" marker-end="url(#arrowB)"/>
+          <path d="M410 86 C350 250 210 258 160 212" fill="none" stroke="#bd5b42" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowB)"/>
+          <path d="M410 86 C470 250 610 258 660 212" fill="none" stroke="#bd5b42" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowB)"/>
+          <text x="410" y="304" text-anchor="middle" font-size="14" fill="#3c526a">普通 Job：一个子协程失败，会取消父协程，父再取消所有兄弟协程</text>
+        </svg>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3><code>coroutineScope</code></h3>
+<pre><code class="language-kotlin">suspend fun loadScreen() = coroutineScope {
+    val user = async { repo.user() }
+    val feed = async { repo.feed() }
+    Screen(user.await(), feed.await())
+}</code></pre>
+          <p>任何子任务失败，整个 scope 失败，兄弟任务被取消。适合“结果必须全部成功”的场景。</p>
+        </div>
+        <div class="card">
+          <h3><code>supervisorScope</code></h3>
+<pre><code class="language-kotlin">suspend fun loadCards() = supervisorScope {
+    val profile = async { runCatching { repo.profile() } }
+    val ads = async { runCatching { repo.ads() } }
+    profile.await() to ads.await()
+}</code></pre>
+          <p>子失败不自动取消父和兄弟。适合“多个模块互不拖累”的页面。</p>
+        </div>
+      </div>
+      <h3>取消是协作式，不是抢占式</h3>
+<pre><code class="language-kotlin">suspend fun crunch(items: List&lt;Item&gt;) = withContext(Dispatchers.Default) {
+    for (item in items) {
+        ensureActive()       // 主动检查取消
+        process(item)
+        if (item.index % 100 == 0) yield()
+    }
+}</code></pre>
+      <div class="warn"><strong>高频坑：</strong><code>cancel()</code> 只是设置取消状态。协程需要在挂起点、<code>ensureActive()</code>、<code>yield()</code> 或检查 <code>isActive</code> 时响应。纯 CPU while 循环如果不主动检查，可能无法及时取消。</div>
+    </section>
+
+    <section class="section" id="exceptions">
+      <h2>异常处理体系：launch、async、CEH 不能混着背</h2>
+      <p class="lead">协程异常面试最爱问，因为很多错误代码能跑，但生命周期和错误边界全是隐患。</p>
+      <table>
+        <thead><tr><th>场景</th><th>异常表现</th><th>正确处理方式</th></tr></thead>
+        <tbody>
+          <tr><td>根协程 <code>launch</code></td><td>未捕获异常会交给 <code>CoroutineExceptionHandler</code> 或线程未捕获异常处理器</td><td>在根 Scope 配置 CEH 兜底</td></tr>
+          <tr><td>子协程 <code>launch</code></td><td>异常先取消父 Job，再由父向兄弟传播取消</td><td>局部 try/catch 或使用 supervisor 边界</td></tr>
+          <tr><td>根协程 <code>async</code></td><td>异常保存在 <code>Deferred</code> 中，<code>await()</code> 时抛出；CEH 不兜这个异常</td><td>对 <code>await()</code> try/catch</td></tr>
+          <tr><td>普通父子结构中的 <code>async</code></td><td>异常仍会使子 Job 失败，并默认取消父；<code>await()</code> 还会重新抛出</td><td>需要隔离时放进 <code>supervisorScope</code> 或使用 <code>SupervisorJob</code></td></tr>
+          <tr><td><code>CancellationException</code></td><td>表示正常取消，默认不当作错误上报</td><td>不要吞掉它；catch Throwable 时要重新抛出</td></tr>
+        </tbody>
+      </table>
+<pre><code class="language-kotlin">// 错误：吞掉 CancellationException，会破坏取消
+try {
+    repository.sync()
+} catch (t: Throwable) {
+    logger.log(t)
+}
+
+// 正确：取消要继续向外传
+try {
+    repository.sync()
+} catch (e: CancellationException) {
+    throw e
+} catch (t: Throwable) {
+    logger.log(t)
+}</code></pre>
+      <div class="note"><strong>面试表达模板：</strong><code>CoroutineExceptionHandler</code> 只处理“未被消费的根协程异常”。它不是 try/catch 的替代品，也不会处理 <code>async</code> 已经封装到 Deferred 里的异常。业务可恢复错误应该在业务边界 catch，CEH 更像最后兜底日志。</div>
+    </section>
+
+    <section class="section" id="flow">
+      <h2>Flow：冷流、操作符链和 flowOn</h2>
+      <p class="lead">Flow 是协程世界里的异步数据流。它的难点不是 API 名字，而是“谁触发生产、谁在哪个线程执行、异常从哪里被 catch”。</p>
+      <div class="grid two">
+        <div class="card">
+          <h3>Cold Flow</h3>
+          <p>每次 <code>collect</code> 都重新执行上游 block。适合网络轮询、数据库查询、一次性数据生产。</p>
+<pre><code class="language-kotlin">val users = flow {
+    emit(api.fetchUsers())
+}</code></pre>
+        </div>
+        <div class="card">
+          <h3>Hot Flow</h3>
+          <p>独立于收集者存在，多个收集者共享同一份数据。典型代表是 <code>StateFlow</code> 和 <code>SharedFlow</code>。</p>
+<pre><code class="language-kotlin">private val _state = MutableStateFlow(UiState())
+val state = _state.asStateFlow()</code></pre>
+        </div>
+      </div>
+      <h3>操作符链是“从尾到头 collect，从头到尾 emit”</h3>
+<pre><code class="language-kotlin">flow {
+    emit(1)
+    emit(2)
+}.map { it * 10 }
+ .filter { it &gt; 10 }
+ .collect { println(it) }</code></pre>
+      <p>调用 <code>collect</code> 后，下游 collector 一层层包装上游；当原始 flow 执行 <code>emit</code> 时，数据沿着 map、filter、collect 传下去。默认情况下它是顺序管道，上一个值没处理完，不会处理下一个值。</p>
+      <h3><code>flowOn</code> 只影响上游</h3>
+<pre><code class="language-kotlin">repository.userFlow()
+    .map { heavyMap(it) }        // Dispatchers.Default
+    .flowOn(Dispatchers.Default)
+    .onEach { render(it) }       // Main，取决于 collect 所在协程
+    .launchIn(viewModelScope)</code></pre>
+      <div class="warn"><strong>不要在 <code>flow {}</code> 里随意 <code>withContext</code> 发射数据。</strong>Flow 有上下文保持规则，上游线程切换应该通过 <code>flowOn</code> 表达，这样异常、取消和背压语义更清晰。</div>
+    </section>
+
+    <section class="section" id="stateflow">
+      <h2>StateFlow / SharedFlow：UI 状态和一次性事件分开建模</h2>
+      <p class="lead">Android 页面里最常见的错误，是把状态和事件都塞进一个流里。状态要可重放、可读当前值；事件通常只想消费一次。</p>
+      <table>
+        <thead><tr><th>类型</th><th>特点</th><th>适合场景</th><th>注意点</th></tr></thead>
+        <tbody>
+          <tr><td><code>StateFlow</code></td><td>必须有初始值，只保留最新值，按 <code>equals</code> 去重</td><td>页面 UI 状态、表单状态、加载状态</td><td>用不可变 data class，更新用 <code>copy</code></td></tr>
+          <tr><td><code>SharedFlow</code></td><td>可配置 replay、buffer、溢出策略</td><td>导航、Toast、Snackbar、埋点事件</td><td>一次性事件通常 <code>replay = 0</code></td></tr>
+          <tr><td><code>Channel</code></td><td>点对点通信，receive 消费后移除</td><td>严格单消费者任务队列</td><td>配置容量和关闭语义要谨慎</td></tr>
+        </tbody>
+      </table>
+<pre><code class="language-kotlin">data class ProfileUiState(
+    val loading: Boolean = false,
+    val user: User? = null,
+    val error: String? = null
+)
+
+class ProfileViewModel(
+    private val repo: UserRepository
+) : ViewModel() {
+    private val _state = MutableStateFlow(ProfileUiState())
+    val state: StateFlow&lt;ProfileUiState&gt; = _state.asStateFlow()
+
+    private val _events = MutableSharedFlow&lt;UiEvent&gt;()
+    val events: SharedFlow&lt;UiEvent&gt; = _events.asSharedFlow()
+
+    fun load() = viewModelScope.launch {
+        _state.update { it.copy(loading = true, error = null) }
+        runCatching { repo.loadUser() }
+            .onSuccess { user -&gt; _state.update { it.copy(loading = false, user = user) } }
+            .onFailure { e -&gt;
+                if (e is CancellationException) throw e
+                _state.update { it.copy(loading = false, error = e.message) }
+                _events.emit(UiEvent.ShowToast("加载失败"))
+            }
+    }
+}</code></pre>
+      <div class="tip"><strong>Compose 侧建议：</strong>使用生命周期感知的收集方式，例如 <code>collectAsStateWithLifecycle()</code>。传统 View 侧使用 <code>repeatOnLifecycle</code>，避免页面不可见时仍然收集 UI 数据。</div>
+    </section>
+
+    <section class="section" id="android">
+      <h2>Android 落地架构：让协程待在正确的层</h2>
+      <p class="lead">稳定的协程代码不是“哪里都 launch 一下”，而是每一层只承担自己的职责。</p>
+      <div class="grid three">
+        <article class="card">
+          <h3>UI 层</h3>
+          <ul>
+            <li>只收集状态、触发用户意图。</li>
+            <li>不要在 Activity/Fragment 里长期持有裸 Scope。</li>
+            <li>按生命周期收集 Flow。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>ViewModel 层</h3>
+          <ul>
+            <li>用 <code>viewModelScope</code> 启动页面任务。</li>
+            <li>暴露不可变 <code>StateFlow</code>。</li>
+            <li>把异常转成 UI 状态或事件。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Data 层</h3>
+          <ul>
+            <li>优先暴露 <code>suspend</code> 或 <code>Flow</code>。</li>
+            <li>内部切到 IO 或 Default。</li>
+            <li>不要依赖 Android UI 生命周期。</li>
+          </ul>
+        </article>
+      </div>
+<pre><code class="language-kotlin">// Fragment / View
+viewLifecycleOwner.lifecycleScope.launch {
+    repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.state.collect { state -&gt;
+            render(state)
+        }
+    }
+}</code></pre>
+      <div class="note"><strong>为什么要 repeatOnLifecycle：</strong>它会在生命周期进入目标状态时启动收集，离开时取消收集。这样 UI 不可见时，上游能按取消语义停下来，减少泄漏和无意义刷新。</div>
+      <h3>一套可复用的加载模式</h3>
+<pre><code class="language-kotlin">fun refresh() = viewModelScope.launch {
+    _state.update { it.copy(refreshing = true, error = null) }
+    try {
+        val data = repository.refresh()
+        _state.update { it.copy(refreshing = false, items = data) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: IOException) {
+        _state.update { it.copy(refreshing = false, error = "网络异常") }
+    } catch (e: Throwable) {
+        _state.update { it.copy(refreshing = false, error = "未知错误") }
+    }
+}</code></pre>
+    </section>
+
+    <section class="section" id="testing">
+      <h2>测试与调试：控制 Dispatcher 和虚拟时间</h2>
+      <p class="lead">协程测试的关键是可控：不要让测试依赖真实线程、真实 delay、真实主线程。</p>
+      <div class="grid two">
+        <div class="card">
+          <h3>测试原则</h3>
+          <ul class="checklist">
+            <li>Dispatcher 从构造函数注入。</li>
+            <li>测试使用 <code>runTest</code>。</li>
+            <li>用 <code>StandardTestDispatcher</code> 控制任务推进。</li>
+            <li>用 <code>advanceUntilIdle()</code> 等待协程完成。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>调试原则</h3>
+          <ul class="checklist">
+            <li>给关键协程加 <code>CoroutineName</code>。</li>
+            <li>日志里打印线程名和 Job 状态。</li>
+            <li>遇到卡死先看是否阻塞 Main。</li>
+            <li>遇到泄漏先看 Scope 生命周期。</li>
+          </ul>
+        </div>
+      </div>
+<pre><code class="language-kotlin">@Test
+fun loadUser_updatesState() = runTest {
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val vm = ProfileViewModel(
+        repo = FakeUserRepository(),
+        dispatcher = dispatcher
+    )
+
+    vm.load()
+    advanceUntilIdle()
+
+    assertThat(vm.state.value.user?.name).isEqualTo("Ada")
+}</code></pre>
+      <div class="warn"><strong>面试高频：</strong>为什么不建议在代码里硬编码 <code>Dispatchers.IO</code>？因为测试无法替换，虚拟时间无法控制，也不利于在不同平台或场景下调整调度策略。</div>
+    </section>
+
+    <section class="section" id="performance">
+      <h2>性能与反模式：协程不是万能加速器</h2>
+      <p class="lead">协程让异步代码更好组织，但不会让阻塞代码自动变快。错误使用 Dispatcher、Flow 和 Scope，反而会制造卡顿、泄漏和难以复现的异常。</p>
+      <div class="grid two">
+        <article class="card">
+          <h3>反模式清单</h3>
+          <ul>
+            <li><code>GlobalScope.launch</code> 启动业务任务，生命周期无人管理。</li>
+            <li>在 Main 线程执行阻塞 IO 或大量 JSON 解析。</li>
+            <li>用 <code>runBlocking</code> 包住 Android UI 代码。</li>
+            <li>catch <code>Throwable</code> 后吞掉 <code>CancellationException</code>。</li>
+            <li>把一次性事件建模成 <code>StateFlow</code>，旋转屏幕后重复消费。</li>
+            <li>对高频 Flow 每个值都刷新整个页面。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>优化抓手</h3>
+          <ul>
+            <li>CPU 任务放 <code>Default</code>，阻塞 IO 放 <code>IO</code>。</li>
+            <li>高频输入使用 <code>debounce</code>、<code>distinctUntilChanged</code>、<code>conflate</code>。</li>
+            <li>多个独立请求用 <code>async</code> 并发，但用结构化边界等待。</li>
+            <li>共享昂贵上游用 <code>stateIn</code> 或 <code>shareIn</code>。</li>
+            <li>长循环定期 <code>yield</code> 或 <code>ensureActive</code>。</li>
+          </ul>
+        </article>
+      </div>
+<pre><code class="language-kotlin">searchText
+    .debounce(300)
+    .distinctUntilChanged()
+    .flatMapLatest { keyword -&gt; repository.search(keyword) }
+    .catch { e -&gt; emit(emptyList()) }
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )</code></pre>
+    </section>
+
+    <section class="section" id="interview">
+      <h2>大厂面试题库：回答要有“现象 + 原理 + 实战边界”</h2>
+      <p class="lead">下面这些题覆盖 Android 协程面试的大部分核心盘问。点击展开答案，建议自己先口述一遍，再对照补齐关键词。</p>
+      <div class="qa open"><button type="button">1. suspend 函数编译后发生了什么？</button><div class="answer">编译器会把 suspend 函数改写成带 Continuation 参数的状态机。每个挂起点对应一个 label，挂起前保存局部变量和恢复位置，返回 COROUTINE_SUSPENDED；异步操作完成后通过 resumeWith 重新进入状态机。</div></div>
+      <div class="qa"><button type="button">2. 挂起和阻塞有什么区别？</button><div class="answer">阻塞会占住当前线程等待结果；挂起会保存协程状态并返回，当前线程可以执行其他任务。恢复时由 Continuation 和 Dispatcher 决定在哪里继续执行。</div></div>
+      <div class="qa"><button type="button">3. launch 和 async 的区别？</button><div class="answer">launch 返回 Job，表达“只关心完成和取消”；async 返回 Deferred，表达“未来会有结果”。launch 根协程未捕获异常会走 CEH；async 的异常会保存在 Deferred 中，await 时抛出。但在普通父子结构中，async 失败仍会默认取消父 Job。</div></div>
+      <div class="qa"><button type="button">4. CoroutineExceptionHandler 为什么有时不生效？</button><div class="answer">CEH 只处理根协程未捕获异常。它不会处理子协程局部异常、不会替代 try/catch、不会处理 async 已保存到 Deferred 的异常，也不会处理 CancellationException。</div></div>
+      <div class="qa"><button type="button">5. SupervisorJob 和 Job 有什么区别？</button><div class="answer">普通 Job 中子协程失败会取消父协程，父再取消兄弟协程。SupervisorJob 隔离子失败，子异常不自动取消父和兄弟，适合页面多个模块互不影响的加载场景。</div></div>
+      <div class="qa"><button type="button">6. withContext 和 launch 有什么区别？</button><div class="answer">withContext 是挂起函数，会切换上下文并等待代码块完成，返回结果；launch 会启动一个新协程，立即返回 Job。需要顺序拿结果用 withContext，需要并发任务用 launch/async。</div></div>
+      <div class="qa"><button type="button">7. Flow 为什么是冷流？</button><div class="answer">flow{} 的 block 只有 collect 时才执行；每次 collect 都重新执行一遍，收集者之间默认互不共享。所以它适合描述数据生产逻辑，而不是保存 UI 状态。</div></div>
+      <div class="qa"><button type="button">8. flowOn 影响哪一段？</button><div class="answer">flowOn 只影响它上游的 Flow 及操作符，不影响下游 collect。它通常通过上下游协程和 channel 边界实现上下文切换，同时保持 Flow 的上下文规则。</div></div>
+      <div class="qa"><button type="button">9. Flow 的 catch 捕获不到什么？</button><div class="answer">catch 捕获的是上游异常，包括 emit 和上游操作符抛出的异常。collect 块里的异常属于下游，不会被前面的 catch 捕获，需要在 collect 外层 try/catch。</div></div>
+      <div class="qa"><button type="button">10. StateFlow 和 SharedFlow 怎么选？</button><div class="answer">页面状态用 StateFlow，因为它有初始值、保留最新值、可同步读取 value、按 equals 去重。一次性事件用 SharedFlow，因为它可以不重放，避免旋转屏幕或重新订阅时重复消费。</div></div>
+      <div class="qa"><button type="button">11. viewModelScope 为什么适合页面任务？</button><div class="answer">它绑定 ViewModel 生命周期，ViewModel 清理时自动取消子协程；底层通常是 SupervisorJob + Main Dispatcher。这样页面任务不会泄漏到 ViewModel 之外。</div></div>
+      <div class="qa"><button type="button">12. repeatOnLifecycle 解决什么问题？</button><div class="answer">它让 Flow 收集随着生命周期自动启动和取消。页面不可见时取消收集，重新可见时再次收集，避免 UI 不可见时仍刷新或泄漏。</div></div>
+      <div class="qa"><button type="button">13. 为什么不推荐 GlobalScope？</button><div class="answer">GlobalScope 不绑定业务生命周期，任务失败和取消都难以管理，容易造成泄漏和后台任务失控。除非是进程级、明确生命周期的全局任务，否则应使用业务 Scope。</div></div>
+      <div class="qa"><button type="button">14. 如何并发请求两个接口并合并结果？</button><div class="answer">在 coroutineScope 中用 async 启动两个子任务，再 await 合并。这样外层会等待所有子任务；任何一个失败会取消另一个并把异常抛给调用方。如果希望部分失败可用，用 supervisorScope + runCatching。</div></div>
+      <div class="qa"><button type="button">15. 取消为什么要重新抛 CancellationException？</button><div class="answer">CancellationException 是协程取消的正常信号。如果 catch Throwable 后吞掉它，父协程以为任务正常完成，取消传播被破坏，可能导致资源继续运行或状态错误。</div></div>
+      <div class="qa"><button type="button">16. 如何测试 delay 和 Dispatcher？</button><div class="answer">使用 kotlinx-coroutines-test 的 runTest、TestDispatcher 和 TestScheduler。生产代码通过构造函数注入 Dispatcher，测试中替换为 StandardTestDispatcher，再用 advanceUntilIdle 或 advanceTimeBy 推进虚拟时间。</div></div>
+    </section>
+
+    <section class="section" id="deploy">
+      <h2>Railway 部署：这个站点已经按静态服务准备</h2>
+      <p class="lead">项目只需要 Node 启动一个静态文件服务器。Railway 会注入 <code>PORT</code> 环境变量，<code>server.js</code> 会监听它。</p>
+      <div class="grid two">
+        <div class="card">
+          <h3>本地运行</h3>
+<pre><code class="language-bash">npm install
+npm start
+# 打开 http://localhost:3000</code></pre>
+        </div>
+        <div class="card">
+          <h3>Railway CLI 部署</h3>
+<pre><code class="language-bash">npm i -g @railway/cli
+railway login
+railway init
+railway up</code></pre>
+        </div>
+      </div>
+      <div class="note"><strong>当前环境状态：</strong>如果本机已经安装 Railway CLI 并登录，我可以直接部署；否则需要你先登录 Railway 或提供可用的部署授权。部署配置文件已放在项目里。</div>
+    </section>
+
+    <footer class="footer">
+      <p>建议阅读方式：先按学习路线通读，再回到面试题区自测。真正写项目时，以 Android 落地架构、异常处理表和反模式清单作为代码审查 checklist。</p>
+    </footer>
+  </main>
+</div>
+
+<button class="top" id="topButton" type="button" aria-label="返回顶部">↑</button>
+
+<script>
+const links = Array.from(document.querySelectorAll(".nav a"));
+const sections = links.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+
+document.querySelectorAll(".qa button").forEach(button => {
+  button.addEventListener("click", () => button.closest(".qa").classList.toggle("open"));
+});
+
+const topButton = document.getElementById("topButton");
+topButton.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+window.addEventListener("scroll", () => {
+  topButton.classList.toggle("show", window.scrollY > 500);
+});
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    links.forEach(link => link.classList.toggle("active", link.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach(section => observer.observe(section));
+
+const search = document.getElementById("search");
+search.addEventListener("keydown", event => {
+  if (event.key !== "Enter") return;
+  const query = search.value.trim().toLowerCase();
+  if (!query) return;
+  const walker = document.createTreeWalker(document.querySelector(".content"), NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!node.textContent.toLowerCase().includes(query)) continue;
+    const target = node.parentElement.closest("section, .card, .qa, p, li, pre") || node.parentElement;
+    document.querySelectorAll(".highlight").forEach(el => el.classList.remove("highlight"));
+    target.classList.add("highlight");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => target.classList.remove("highlight"), 2200);
+    break;
+  }
+});
+</script>
+</body>
+</html>
