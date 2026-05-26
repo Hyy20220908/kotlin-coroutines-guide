@@ -420,7 +420,6 @@ td{color:var(--muted)}
         <span class="nav-kicker">Interview</span>
         <a href="#interview">大厂面试题库</a>
         <a href="#interview-drill">追问训练</a>
-        <a href="#deploy">Railway 部署</a>
       </div>
     </nav>
   </aside>
@@ -455,7 +454,7 @@ td{color:var(--muted)}
         <div class="stats">
           <div class="stat"><strong>10</strong><span>核心章节</span></div>
           <div class="stat"><strong>60+</strong><span>面试追问点</span></div>
-          <div class="stat"><strong>1</strong><span>可部署静态站</span></div>
+          <div class="stat"><strong>4</strong><span>实战场景</span></div>
         </div>
       </div>
     </section>
@@ -1056,27 +1055,6 @@ fun loadUser_updatesState() = runTest {
         <strong>90 分</strong><span>能用状态机、Job 树、Dispatcher、Flow 管道解释现象，并能指出常见错误用法。</span>
         <strong>95+ 分</strong><span>能主动补充源码心智模型、测试策略、性能边界和业务取舍，不靠背诵也能处理变体追问。</span>
       </div>
-    </section>
-
-    <section class="section" id="deploy">
-      <h2>Railway 部署：这个站点已经按静态服务准备</h2>
-      <p class="lead">项目只需要 Node 启动一个静态文件服务器。Railway 会注入 <code>PORT</code> 环境变量，<code>server.js</code> 会监听它。</p>
-      <div class="grid two">
-        <div class="card">
-          <h3>本地运行</h3>
-<pre><code class="language-bash">npm install
-npm start
-# 打开 http://localhost:3000</code></pre>
-        </div>
-        <div class="card">
-          <h3>Railway CLI 部署</h3>
-<pre><code class="language-bash">npm i -g @railway/cli
-railway login
-railway init
-railway up</code></pre>
-        </div>
-      </div>
-      <div class="note"><strong>当前环境状态：</strong>如果本机已经安装 Railway CLI 并登录，我可以直接部署；否则需要你先登录 Railway 或提供可用的部署授权。部署配置文件已放在项目里。</div>
     </section>
 
     <footer class="footer">
