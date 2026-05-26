@@ -294,6 +294,46 @@ td{color:var(--muted)}
 .checklist{list-style:none!important;padding-left:0!important}
 .checklist li{position:relative;padding-left:26px}
 .checklist li:before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:900}
+.learning-contract{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:10px;
+  margin:18px 0;
+}
+.contract-step{
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:rgba(255,255,255,.03);
+}
+.contract-step strong{display:block;color:var(--text);font-size:13px}
+.contract-step span{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:4px}
+.case-card{display:grid;gap:12px}
+.case-tag{
+  display:inline-flex;
+  width:max-content;
+  min-height:28px;
+  align-items:center;
+  padding:3px 9px;
+  border-radius:999px;
+  color:#03151a;
+  background:var(--accent);
+  font-size:12px;
+  font-weight:800;
+}
+.rubric{
+  display:grid;
+  grid-template-columns:120px minmax(0,1fr);
+  gap:0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  margin:14px 0;
+}
+.rubric strong,.rubric span{padding:12px;border-bottom:1px solid var(--line)}
+.rubric strong{color:var(--text);background:rgba(255,255,255,.05)}
+.rubric span{color:var(--muted)}
+.rubric strong:last-of-type,.rubric span:last-child{border-bottom:0}
 .footer{padding:28px clamp(20px,5vw,72px);color:var(--subtle);font-size:13px}
 .top{
   position:fixed;
@@ -347,6 +387,9 @@ td{color:var(--muted)}
   .hero h1{font-size:38px}
   .hero p{font-size:16px}
   .grid.two,.grid.three,.split{grid-template-columns:1fr}
+  .learning-contract{grid-template-columns:1fr}
+  .rubric{grid-template-columns:1fr}
+  .rubric strong{border-bottom:0}
   .stats{grid-template-columns:1fr}
   .stat{border-right:0;border-bottom:1px solid var(--line-soft)}
   .diagram{padding:12px}
@@ -367,6 +410,7 @@ td{color:var(--muted)}
       <div class="nav-section">
         <span class="nav-kicker">Start</span>
         <a href="#roadmap">学习路线</a>
+        <a href="#learning-contract">学习契约</a>
         <a href="#mental-model">核心心智模型</a>
       </div>
       <div class="nav-section">
@@ -384,12 +428,15 @@ td{color:var(--muted)}
       <div class="nav-section">
         <span class="nav-kicker">Android</span>
         <a href="#android">Android 落地架构</a>
+        <a href="#case-lab">场景实验室</a>
         <a href="#testing">测试与调试</a>
         <a href="#performance">性能与反模式</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Interview</span>
         <a href="#interview">大厂面试题库</a>
+        <a href="#interview-drill">追问训练</a>
+        <a href="#advanced-map">进阶路线</a>
         <a href="#deploy">Railway 部署</a>
       </div>
     </nav>
@@ -439,6 +486,39 @@ td{color:var(--muted)}
         <div class="path-step"><h3>第三层：用 Job 树解释生命周期</h3><p>父取消子、子异常影响父、兄弟协程如何被级联取消，这些都由结构化并发和 Job 状态机控制。</p></div>
         <div class="path-step"><h3>第四层：把 Flow 当成数据管道</h3><p>冷流负责声明数据生产逻辑，热流负责状态共享。理解 <code>flowOn</code>、<code>catch</code>、<code>stateIn</code> 才能写稳定 UI。</p></div>
         <div class="path-step"><h3>第五层：面向 Android 架构落地</h3><p>ViewModel 暴露状态，Repository 暴露 suspend/Flow，UI 按生命周期收集，测试里控制 Dispatcher 和虚拟时间。</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="learning-contract">
+      <h2>学习契约：每一章都按同一套训练闭环推进</h2>
+      <p class="lead">想超过普通书籍和电子资料，内容必须能让读者自我校验。本网站后续所有章节都会尽量遵守这套结构：不只告诉你“是什么”，还要训练你“什么时候用、为什么这样、错了怎么定位”。</p>
+      <div class="learning-contract">
+        <div class="contract-step"><strong>现象</strong><span>先看一段会发生在真实项目里的代码或 bug。</span></div>
+        <div class="contract-step"><strong>正确用法</strong><span>给出推荐写法，并说明边界条件。</span></div>
+        <div class="contract-step"><strong>错误用法</strong><span>列出能编译但会泄漏、卡顿或异常丢失的写法。</span></div>
+        <div class="contract-step"><strong>底层原理</strong><span>用状态机、Job 树、上下文或 Flow 管道解释。</span></div>
+        <div class="contract-step"><strong>Android 场景</strong><span>落到 ViewModel、Repository、Lifecycle、Compose。</span></div>
+        <div class="contract-step"><strong>面试追问</strong><span>准备标准答案、追问链和加分表达。</span></div>
+      </div>
+      <div class="grid two">
+        <article class="card">
+          <h3>读者自测标准</h3>
+          <ul class="checklist">
+            <li>能不用背诵 API，画出概念之间的关系。</li>
+            <li>能解释为什么这段代码会取消、泄漏或卡住。</li>
+            <li>能把异常处理从“兜底日志”改成业务边界设计。</li>
+            <li>能写出可测试的 ViewModel 和 Repository 协程代码。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>资料升级原则</h3>
+          <ul class="checklist">
+            <li>结论对齐 Kotlin 和 Android 官方文档。</li>
+            <li>关键概念给出源码级心智模型，而不是只放源码片段。</li>
+            <li>所有面试答案都包含现象、原理、项目边界。</li>
+            <li>每个实战案例都能变成代码审查 checklist。</li>
+          </ul>
+        </article>
       </div>
     </section>
 
@@ -805,6 +885,77 @@ viewLifecycleOwner.lifecycleScope.launch {
 }</code></pre>
     </section>
 
+    <section class="section" id="case-lab">
+      <h2>场景实验室：把协程放回真实业务</h2>
+      <p class="lead">真正能拉开水平差距的不是会写 <code>launch</code>，而是面对页面加载、搜索、部分失败、退出取消、事件消费时，能选对结构并解释原因。</p>
+      <div class="grid two">
+        <article class="card case-card">
+          <span class="case-tag">Case 1</span>
+          <h3>首页多个模块并发加载，部分失败不拖垮全页</h3>
+          <p>业务诉求：用户信息、推荐流、广告、未读数可以并发加载。推荐流失败不应该让用户信息也消失。</p>
+<pre><code class="language-kotlin">suspend fun loadHome(): HomeUiModel = supervisorScope {
+    val profile = async { runCatching { repo.profile() } }
+    val feed = async { runCatching { repo.feed() } }
+    val badges = async { runCatching { repo.badges() } }
+
+    HomeUiModel(
+        profile = profile.await().getOrNull(),
+        feed = feed.await().getOrElse { emptyList() },
+        badges = badges.await().getOrDefault(0)
+    )
+}</code></pre>
+          <p><strong>判断标准：</strong>多个模块互不强依赖，用 <code>supervisorScope</code> 做故障隔离；如果任何模块失败都必须整体失败，才用 <code>coroutineScope</code>。</p>
+        </article>
+        <article class="card case-card">
+          <span class="case-tag">Case 2</span>
+          <h3>搜索框防抖，旧请求自动取消</h3>
+          <p>业务诉求：用户持续输入时，不应该每个字符都请求；新关键词到来后，旧关键词的网络结果不应该覆盖新结果。</p>
+<pre><code class="language-kotlin">val results = queryFlow
+    .debounce(300)
+    .map { it.trim() }
+    .distinctUntilChanged()
+    .flatMapLatest { keyword -&gt;
+        if (keyword.isBlank()) flowOf(emptyList())
+        else repository.search(keyword)
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())</code></pre>
+          <p><strong>判断标准：</strong><code>flatMapLatest</code> 表达“只要最新”，旧上游会被取消；如果要保留所有请求顺序，才考虑 <code>flatMapConcat</code>。</p>
+        </article>
+        <article class="card case-card">
+          <span class="case-tag">Case 3</span>
+          <h3>页面退出后，网络请求必须取消</h3>
+          <p>业务诉求：详情页退出后，请求不应该继续更新已销毁页面；ViewModel 清理时任务要一起结束。</p>
+<pre><code class="language-kotlin">class DetailViewModel(
+    private val repo: DetailRepository
+) : ViewModel() {
+    fun load(id: Long) = viewModelScope.launch {
+        _state.update { it.copy(loading = true) }
+        val detail = repo.detail(id)
+        _state.update { it.copy(loading = false, detail = detail) }
+    }
+}</code></pre>
+          <p><strong>判断标准：</strong>页面任务用 <code>viewModelScope</code>，UI 收集用生命周期感知 API。不要把页面请求丢进 <code>GlobalScope</code>。</p>
+        </article>
+        <article class="card case-card">
+          <span class="case-tag">Case 4</span>
+          <h3>一次性事件不要伪装成状态</h3>
+          <p>业务诉求：Toast、导航、Snackbar 只消费一次，旋转屏幕或重新订阅时不应重复弹出。</p>
+<pre><code class="language-kotlin">private val _events = MutableSharedFlow&lt;UiEvent&gt;(
+    replay = 0,
+    extraBufferCapacity = 1
+)
+val events = _events.asSharedFlow()
+
+fun submit() = viewModelScope.launch {
+    runCatching { repo.submit() }
+        .onSuccess { _events.emit(UiEvent.NavigateBack) }
+        .onFailure { _events.emit(UiEvent.Toast("提交失败")) }
+}</code></pre>
+          <p><strong>判断标准：</strong>状态用 <code>StateFlow</code>，事件用 <code>SharedFlow</code>。不要把导航事件塞进 UiState 后靠手动清空硬凑。</p>
+        </article>
+      </div>
+    </section>
+
     <section class="section" id="testing">
       <h2>测试与调试：控制 Dispatcher 和虚拟时间</h2>
       <p class="lead">协程测试的关键是可控：不要让测试依赖真实线程、真实 delay、真实主线程。</p>
@@ -901,6 +1052,79 @@ fun loadUser_updatesState() = runTest {
       <div class="qa"><button type="button">14. 如何并发请求两个接口并合并结果？</button><div class="answer">在 coroutineScope 中用 async 启动两个子任务，再 await 合并。这样外层会等待所有子任务；任何一个失败会取消另一个并把异常抛给调用方。如果希望部分失败可用，用 supervisorScope + runCatching。</div></div>
       <div class="qa"><button type="button">15. 取消为什么要重新抛 CancellationException？</button><div class="answer">CancellationException 是协程取消的正常信号。如果 catch Throwable 后吞掉它，父协程以为任务正常完成，取消传播被破坏，可能导致资源继续运行或状态错误。</div></div>
       <div class="qa"><button type="button">16. 如何测试 delay 和 Dispatcher？</button><div class="answer">使用 kotlinx-coroutines-test 的 runTest、TestDispatcher 和 TestScheduler。生产代码通过构造函数注入 Dispatcher，测试中替换为 StandardTestDispatcher，再用 advanceUntilIdle 或 advanceTimeBy 推进虚拟时间。</div></div>
+    </section>
+
+    <section class="section" id="interview-drill">
+      <h2>追问训练：把一句答案升级成一条推理链</h2>
+      <p class="lead">大厂面试通常不会停在“是什么”。真正的追问会从 API 问到异常、取消、源码模型和项目取舍。下面用几条典型链路训练回答层次。</p>
+      <div class="grid two">
+        <article class="card">
+          <h3>链路 A：suspend 到状态机</h3>
+          <ol>
+            <li><strong>第一问：</strong><code>suspend</code> 是什么？</li>
+            <li><strong>追问：</strong>它会自动切线程吗？</li>
+            <li><strong>追问：</strong>挂起时线程去哪了？</li>
+            <li><strong>追问：</strong>局部变量如何恢复？</li>
+            <li><strong>加分：</strong>说出 Continuation、label、<code>COROUTINE_SUSPENDED</code> 的关系。</li>
+          </ol>
+        </article>
+        <article class="card">
+          <h3>链路 B：async 到异常边界</h3>
+          <ol>
+            <li><strong>第一问：</strong><code>launch</code> 和 <code>async</code> 区别？</li>
+            <li><strong>追问：</strong><code>async</code> 异常什么时候抛？</li>
+            <li><strong>追问：</strong>CEH 为什么捕不到？</li>
+            <li><strong>追问：</strong>子 async 失败会不会取消父？</li>
+            <li><strong>加分：</strong>区分根 async 与结构化父子 async。</li>
+          </ol>
+        </article>
+        <article class="card">
+          <h3>链路 C：Flow 到线程切换</h3>
+          <ol>
+            <li><strong>第一问：</strong>Flow 为什么是冷流？</li>
+            <li><strong>追问：</strong>操作符链执行顺序？</li>
+            <li><strong>追问：</strong><code>flowOn</code> 影响上游还是下游？</li>
+            <li><strong>追问：</strong>为什么不推荐在 <code>flow {}</code> 里 <code>withContext</code> emit？</li>
+            <li><strong>加分：</strong>说出上下文保持和 channel 边界的心智模型。</li>
+          </ol>
+        </article>
+        <article class="card">
+          <h3>链路 D：Android 生命周期</h3>
+          <ol>
+            <li><strong>第一问：</strong><code>viewModelScope</code> 解决什么？</li>
+            <li><strong>追问：</strong>为什么 UI 收集 Flow 要感知生命周期？</li>
+            <li><strong>追问：</strong><code>repeatOnLifecycle</code> 离开 STARTED 会发生什么？</li>
+            <li><strong>追问：</strong>Repository 是否应该依赖 ViewModelScope？</li>
+            <li><strong>加分：</strong>讲清 UI、ViewModel、Data 三层协程边界。</li>
+          </ol>
+        </article>
+      </div>
+      <h3>回答评分标准</h3>
+      <div class="rubric">
+        <strong>60 分</strong><span>能说出 API 作用和基本用法，但容易混淆异常、取消和生命周期边界。</span>
+        <strong>75 分</strong><span>能结合 Android 场景给出正确写法，知道 <code>viewModelScope</code>、<code>repeatOnLifecycle</code>、<code>StateFlow</code> 的适用场景。</span>
+        <strong>90 分</strong><span>能用状态机、Job 树、Dispatcher、Flow 管道解释现象，并能指出常见错误用法。</span>
+        <strong>95+ 分</strong><span>能主动补充源码心智模型、测试策略、性能边界和业务取舍，不靠背诵也能处理变体追问。</span>
+      </div>
+    </section>
+
+    <section class="section" id="advanced-map">
+      <h2>进阶路线：把网站继续打磨成协程知识系统</h2>
+      <p class="lead">这不是最终形态。要真正超过多数资料，后续应该继续把“概念解释”升级成“可操作、可验证、可演练”的学习系统。</p>
+      <div class="grid three">
+        <article class="card">
+          <h3>源码地图</h3>
+          <p>按主题串联关键源码：<code>BaseContinuationImpl</code>、<code>DispatchedContinuation</code>、<code>JobSupport</code>、<code>SafeCollector</code>、<code>StateFlowImpl</code>。</p>
+        </article>
+        <article class="card">
+          <h3>练习系统</h3>
+          <p>每章加入“判断输出顺序”“找泄漏点”“修复异常处理”“改造成可测试代码”等练习，并给评分答案。</p>
+        </article>
+        <article class="card">
+          <h3>项目 Demo</h3>
+          <p>建设一个小型 Android Demo：搜索、详情、首页聚合、离线缓存、一次性事件、单测，所有协程知识都能落到代码。</p>
+        </article>
+      </div>
     </section>
 
     <section class="section" id="deploy">
