@@ -403,6 +403,7 @@ td{color:var(--muted)}
         <a href="#context">Scope / Context / Dispatcher</a>
         <a href="#structured">结构化并发与取消</a>
         <a href="#exceptions">异常处理体系</a>
+        <a href="#source-map">源码导读</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Flow</span>
@@ -418,6 +419,7 @@ td{color:var(--muted)}
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Interview</span>
+        <a href="#exercise-lab">练习题</a>
         <a href="#interview">大厂面试题库</a>
         <a href="#interview-drill">追问训练</a>
       </div>
@@ -452,7 +454,7 @@ td{color:var(--muted)}
           <div class="flow-node"><div class="flow-icon">4</div><div><strong>resumeWith 恢复</strong><span>Dispatcher 决定在哪个线程继续执行状态机</span></div></div>
         </div>
         <div class="stats">
-          <div class="stat"><strong>10</strong><span>核心章节</span></div>
+          <div class="stat"><strong>12+</strong><span>核心模块</span></div>
           <div class="stat"><strong>60+</strong><span>面试追问点</span></div>
           <div class="stat"><strong>4</strong><span>实战场景</span></div>
         </div>
@@ -703,6 +705,50 @@ try {
     logger.log(t)
 }</code></pre>
       <div class="note"><strong>面试表达模板：</strong><code>CoroutineExceptionHandler</code> 只处理“未被消费的根协程异常”。它不是 try/catch 的替代品，也不会处理 <code>async</code> 已经封装到 Deferred 里的异常。业务可恢复错误应该在业务边界 catch，CEH 更像最后兜底日志。</div>
+    </section>
+
+    <section class="section" id="source-map">
+      <h2>源码导读：不要从文件开始读，要从问题开始读</h2>
+      <p class="lead">协程源码很容易越读越散。更有效的方式是带着问题进入源码：挂起如何恢复、调度器在哪里介入、Job 如何传播取消、Flow 如何保证上下文一致。</p>
+      <div class="grid two">
+        <article class="card">
+          <h3>问题 1：suspend 如何从“暂停”回到原位置？</h3>
+          <ul>
+            <li><code>Continuation</code>：恢复点抽象，核心方法是 <code>resumeWith</code>。</li>
+            <li><code>BaseContinuationImpl</code>：编译器状态机的基类，负责调用 <code>invokeSuspend</code>。</li>
+            <li><code>label</code> 字段：记录下一次恢复应该进入哪个分支。</li>
+          </ul>
+          <p><strong>读完应能：</strong>看懂“挂起不是线程暂停，而是函数返回；恢复不是从头执行，而是进入状态机下一段”。</p>
+        </article>
+        <article class="card">
+          <h3>问题 2：Dispatcher 在哪里切线程？</h3>
+          <ul>
+            <li><code>ContinuationInterceptor</code>：Context 里拦截 Continuation 的入口。</li>
+            <li><code>DispatchedContinuation</code>：把恢复动作包成可调度任务。</li>
+            <li><code>dispatch(context, block)</code>：真正把任务提交到目标线程或线程池。</li>
+          </ul>
+          <p><strong>读完应能：</strong>理解 <code>withContext</code> 和 <code>launch(Dispatchers.IO)</code> 并不是“代码魔法”，而是恢复点被调度器包装。</p>
+        </article>
+        <article class="card">
+          <h3>问题 3：取消和异常为什么会沿 Job 树传播？</h3>
+          <ul>
+            <li><code>JobSupport</code>：维护 Job 状态、完成回调、父子关系。</li>
+            <li><code>childCancelled</code>：子协程失败后，父协程是否被取消的关键路径。</li>
+            <li><code>SupervisorJob</code>：通过改变子失败处理策略，实现故障隔离。</li>
+          </ul>
+          <p><strong>读完应能：</strong>能解释普通 Job 和 SupervisorJob 的差异不是“try/catch 不同”，而是父子失败传播策略不同。</p>
+        </article>
+        <article class="card">
+          <h3>问题 4：Flow 如何保证上下文和顺序？</h3>
+          <ul>
+            <li><code>SafeCollector</code>：检查 emit 是否发生在合法上下文。</li>
+            <li><code>AbstractFlow.collect</code>：收集时包装 collector，并进入上游执行。</li>
+            <li><code>flowOn</code>：在上下游之间建立协程边界，通常伴随 channel 传递。</li>
+          </ul>
+          <p><strong>读完应能：</strong>能说明为什么 <code>catch</code> 只捕获上游、<code>flowOn</code> 只影响上游、<code>flow {}</code> 里乱切上下文会出问题。</p>
+        </article>
+      </div>
+      <div class="tip"><strong>读源码顺序建议：</strong>先用一段最小代码制造现象，再沿调用链看 3 到 5 个关键类。不要试图从协程库入口通读全库；那样很快会迷路。</div>
     </section>
 
     <section class="section" id="flow">
@@ -980,6 +1026,64 @@ fun loadUser_updatesState() = runTest {
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )</code></pre>
+    </section>
+
+    <section class="section" id="exercise-lab">
+      <h2>练习题：看懂不算会，能判断结果才算稳</h2>
+      <p class="lead">下面这些题适合读完对应章节后自测。不要急着展开答案，先说出现象，再说底层原因，最后给出修复方案。</p>
+      <div class="qa open"><button type="button">练习 1：这段代码会打印什么？为什么？</button><div class="answer">
+<pre><code class="language-kotlin">flow {
+    emit(1)
+    emit(2)
+}.map {
+    println("map $it")
+    it * 10
+}.collect {
+    println("collect $it")
+}</code></pre>
+        <p>输出顺序是 <code>map 1</code>、<code>collect 10</code>、<code>map 2</code>、<code>collect 20</code>。默认 Flow 是顺序管道，<code>emit(1)</code> 会等下游 map 和 collect 都处理完，才继续 <code>emit(2)</code>。</p>
+      </div></div>
+      <div class="qa"><button type="button">练习 2：为什么这段 CPU 循环取消不及时？</button><div class="answer">
+<pre><code class="language-kotlin">val job = viewModelScope.launch(Dispatchers.Default) {
+    while (true) {
+        calculateNext()
+    }
+}
+job.cancel()</code></pre>
+        <p>取消是协作式，不是抢占式。这个循环没有挂起点，也没有检查取消状态，所以可能持续运行。修复方式是在循环中使用 <code>ensureActive()</code>、<code>yield()</code> 或检查 <code>isActive</code>。</p>
+      </div></div>
+      <div class="qa"><button type="button">练习 3：这段异常处理有什么问题？</button><div class="answer">
+<pre><code class="language-kotlin">try {
+    repository.sync()
+} catch (t: Throwable) {
+    report(t)
+}</code></pre>
+        <p>它会吞掉 <code>CancellationException</code>，破坏取消传播。正确写法是先捕获取消并重新抛出，再处理业务异常：<code>catch (e: CancellationException) { throw e }</code>。</p>
+      </div></div>
+      <div class="qa"><button type="button">练习 4：为什么 catch 捕不到 collect 里的异常？</button><div class="answer">
+<pre><code class="language-kotlin">flowOf(1)
+    .catch { emit(0) }
+    .collect {
+        error("render failed")
+    }</code></pre>
+        <p><code>catch</code> 只包住它上游的异常。<code>collect</code> 块属于下游，因此这里的异常不会被前面的 <code>catch</code> 捕获。要处理 collect 内部异常，应在 collect 外层使用 try/catch，或者把可能失败的逻辑移动到上游操作符中。</p>
+      </div></div>
+      <div class="qa"><button type="button">练习 5：导航事件为什么不适合放进 StateFlow？</button><div class="answer">
+        <p><code>StateFlow</code> 表达“当前状态”，会持有最新值并在新订阅者收集时立即发出。导航、Toast、Snackbar 属于一次性事件，重新订阅后重复消费会造成重复跳转或重复提示。更合适的是 <code>SharedFlow(replay = 0)</code> 或明确的事件通道。</p>
+      </div></div>
+      <div class="qa"><button type="button">练习 6：如何把不可测试的 Dispatcher 改成可测试？</button><div class="answer">
+<pre><code class="language-kotlin">// 不推荐
+suspend fun load() = withContext(Dispatchers.IO) { api.load() }
+
+// 推荐
+class Repo(
+    private val api: Api,
+    private val io: CoroutineDispatcher
+) {
+    suspend fun load() = withContext(io) { api.load() }
+}</code></pre>
+        <p>生产代码注入 <code>Dispatchers.IO</code>，测试代码注入 <code>StandardTestDispatcher</code> 或 <code>UnconfinedTestDispatcher</code>。这样测试可以用虚拟时间和 <code>advanceUntilIdle()</code> 控制协程推进。</p>
+      </div></div>
     </section>
 
     <section class="section" id="interview">
