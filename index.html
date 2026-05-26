@@ -690,6 +690,15 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
     <section class="section" id="context">
       <h2>Scope / Context / Dispatcher：协程的控制面</h2>
       <p class="lead">协程 API 看起来很多，但控制面可以压缩成三句话：Scope 管生命周期，Context 装配置，Dispatcher 管线程调度。</p>
+      <div class="chapter">
+        <p>如果把协程看成一个任务，那么 Scope、Context、Dispatcher 分别回答三个不同问题：这个任务属于谁，带着哪些配置运行，恢复时应该交给哪个线程执行。很多协程 bug 本质上就是这三个问题没有回答清楚。</p>
+        <p><code>CoroutineScope</code> 不只是一个“能 launch 的对象”。它代表任务的归属关系。一个协程从哪个 Scope 启动，就意味着它默认应该跟随这个 Scope 的生命周期。ViewModel 中的页面任务用 <code>viewModelScope</code>，是因为页面逻辑应该在 ViewModel 清理时结束；Repository 不应该偷用这个 Scope，是因为数据层不应该绑定某个页面。</p>
+        <p><code>CoroutineContext</code> 则像一组不可变配置。它可以包含 Job、Dispatcher、CoroutineName、CoroutineExceptionHandler 等元素。多个 Context 用 <code>+</code> 合并时，同类型 Key 后者会覆盖前者。比如 <code>viewModelScope.launch(Dispatchers.IO)</code> 并不是创建了一个全新的生命周期，而是在原有 Scope 的 Job 之上替换了 Dispatcher。</p>
+        <h3>Dispatcher 选择错，问题不会总是立刻暴露</h3>
+        <p>把阻塞 IO 放在 Main 上，问题通常很明显：页面卡顿。更隐蔽的是把 CPU 密集任务长期丢到 IO，或者在 Default 里执行大量阻塞式数据库/文件读写。前者会让 IO 线程池被计算任务占住，后者会让计算线程等待外部资源，最终都可能造成吞吐下降和响应变慢。</p>
+        <p>选择 Dispatcher 时不要只看“这段代码耗时吗”，还要看它为什么耗时：等待磁盘、网络、数据库这类外部资源，通常属于 IO；排序、解析、压缩、加密、图片处理这类吃 CPU 的工作，通常属于 Default；更新 UI 必须回到 Main。</p>
+        <div class="note"><strong>调试方法：</strong>遇到协程性能问题时，先在日志里打印线程名和 CoroutineName，再确认任务是阻塞等待、CPU 计算，还是 UI 渲染。Dispatcher 选错时，堆栈经常看不出错，但线程使用会很不合理。</div>
+      </div>
       <table>
         <thead><tr><th>概念</th><th>负责什么</th><th>Android 常见例子</th><th>面试关键词</th></tr></thead>
         <tbody>
@@ -1073,6 +1082,10 @@ viewLifecycleOwner.lifecycleScope.launch {
     <section class="section" id="case-lab">
       <h2>场景实验室：把协程放回真实业务</h2>
       <p class="lead">真正能拉开水平差距的不是会写 <code>launch</code>，而是面对页面加载、搜索、部分失败、退出取消、事件消费时，能选对结构并解释原因。</p>
+      <div class="chapter">
+        <p>下面的场景不是为了展示“某个 API 的标准写法”，而是训练判断能力。同样是并发请求，有的场景要整体失败，有的场景要部分可用；同样是 Flow，有的场景要保留所有值，有的场景只要最新值。API 选择取决于业务语义，而不是哪个写法看起来更高级。</p>
+        <p>读每个案例时建议先问三件事：第一，这些任务之间是强依赖还是弱依赖；第二，旧任务是否应该被新任务取消；第三，结果应该进入持续状态还是一次性事件。能回答这三件事，协程结构基本就不会选错。</p>
+      </div>
       <div class="grid two">
         <article class="card case-card">
           <span class="case-tag">Case 1</span>
@@ -1213,6 +1226,16 @@ fun loadUser_updatesState() = runTest {
     <section class="section" id="performance">
       <h2>性能与反模式：协程不是万能加速器</h2>
       <p class="lead">协程让异步代码更好组织，但不会让阻塞代码自动变快。错误使用 Dispatcher、Flow 和 Scope，反而会制造卡顿、泄漏和难以复现的异常。</p>
+      <div class="chapter">
+        <p>协程经常被误解成“轻量级线程”，于是有人以为多开协程就能提升性能。实际上，协程降低的是异步代码的组织成本和等待成本，不会让 CPU 计算变少，也不会让阻塞 IO 自动变快。如果底层 API 本身阻塞，协程只是帮你把阻塞放到更合适的线程池里；如果算法本身很重，协程也不能替你省掉计算。</p>
+        <p>排查协程性能问题，可以从四个方向入手：线程是否被阻塞，取消是否及时生效，Flow 是否产生过多中间值，生命周期是否导致重复收集或重复请求。很多页面卡顿并不是某个函数特别慢，而是这些小问题叠加起来：输入框每个字符都请求、旧请求没取消、列表每次发射都全量刷新、页面不可见时仍然收集。</p>
+        <h3>反模式 1：用协程包装阻塞，却没有切 Dispatcher</h3>
+        <p><code>suspend</code> 本身不保证非阻塞。如果你在 suspend 函数里直接调用阻塞式 SDK，而调用方又在 Main 上执行，就仍然会卡主线程。正确做法是在数据层明确切到 IO，或者使用真正非阻塞的挂起 API。</p>
+        <h3>反模式 2：Flow 发射太频繁，下游处理太重</h3>
+        <p>Flow 默认是顺序的，但这不代表它天然高效。搜索输入、滚动位置、传感器数据、数据库变更都可能高频发射。如果每个值都触发网络请求、复杂 diff 或全页面状态重建，就会造成抖动。此时应该根据语义选择 <code>debounce</code>、<code>sample</code>、<code>distinctUntilChanged</code>、<code>conflate</code> 或 <code>flatMapLatest</code>。</p>
+        <h3>反模式 3：共享上游没有共享，导致重复请求</h3>
+        <p>冷流每次 collect 都会重新执行。如果两个 UI 区域分别 collect 同一个网络 Flow，可能触发两次请求。对于昂贵上游，应在 ViewModel 中用 <code>stateIn</code> 或 <code>shareIn</code> 共享结果，并用 <code>SharingStarted.WhileSubscribed</code> 控制没人订阅时是否停掉上游。</p>
+      </div>
       <div class="grid two">
         <article class="card">
           <h3>反模式清单</h3>
