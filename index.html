@@ -923,6 +923,25 @@ class DispatchedContinuation&lt;T&gt;(
       </div>
     </section>
 
+    <!-- ===== CoroutineContext Element 完整清单 ===== -->
+    <section class="section" id="context-elements">
+      <h2>CoroutineContext Element 完整清单：你可以在 Context 里放什么</h2>
+      <p class="lead">Context 的 <code>+</code> 操作让你组合各种 Element。下面列出所有标准库中的 Element，以及每个 Element 的 Key 和作用域。</p>
+      <table>
+        <thead><tr><th>Element</th><th>Key</th><th>作用</th><th>典型用法</th></tr></thead>
+        <tbody>
+          <tr><td><code>Job / SupervisorJob</code></td><td><code>Job.Key</code></td><td>协程生命周期、父子关系、取消</td><td><code>launch</code> 自动创建</td></tr>
+          <tr><td><code>CoroutineDispatcher</code></td><td><code>ContinuationInterceptor.Key</code></td><td>决定协程在哪个线程恢复</td><td><code>Dispatchers.IO</code></td></tr>
+          <tr><td><code>CoroutineName</code></td><td><code>CoroutineName.Key</code></td><td>协程名称（调试、堆栈）</td><td><code>CoroutineName("loadUser")</code></td></tr>
+          <tr><td><code>CoroutineExceptionHandler</code></td><td><code>CoroutineExceptionHandler.Key</code></td><td>未捕获异常的兜底</td><td>只能设在 Scope 根</td></tr>
+          <tr><td><code>ThreadContextElement</code></td><td>(自定义)</td><td>在协程恢复/挂起时设置/恢复线程局部变量</td><td><code>asContextElement()</code></td></tr>
+          <tr><td><code>NonCancellable</code></td><td><code>NonCancellable.Key</code></td><td>让 withContext 块不可取消（用于 finally）</td><td><code>withContext(NonCancellable) {}</code></td></tr>
+          <tr><td><code>CombinedContext</code></td><td>(内部)</td><td>Context 的链表实现节点</td><td>用户不直接使用</td></tr>
+        </tbody>
+      </table>
+      <div class="tip"><strong>自定义 Element：</strong>你可以用 <code>class MyKey : AbstractCoroutineContextElement(MyKey) { companion object Key : Key&lt;MyKey&gt; }</code> 创建自己的 Context Element，存取方式和标准 Element 完全一致。</div>
+    </section>
+
     <section class="section" id="structured">
       <h2>结构化并发与取消：Job 树决定生死</h2>
       <p class="lead">结构化并发解决的是“谁负责等待、谁负责取消、异常往哪儿传”的问题。没有它，异步任务会变成到处泄漏的后台工作。</p>
@@ -1996,6 +2015,61 @@ class Repo(
     suspend fun load() = withContext(io) { api.load() }
 }</code></pre>
         <p>生产代码注入 <code>Dispatchers.IO</code>，测试代码注入 <code>StandardTestDispatcher</code> 或 <code>UnconfinedTestDispatcher</code>。这样测试可以用虚拟时间和 <code>advanceUntilIdle()</code> 控制协程推进。</p>
+      </div></div>
+
+      <h3>进阶：反模式诊断（你能找出 bug 吗？）</h3>
+      <div class="qa"><button type="button">进阶 1：这段代码有什么隐藏的崩溃风险？</button><div class="answer">
+<pre><code class="language-kotlin">// Android 项目中的这段代码, 可能在哪里崩？
+class MyViewModel : ViewModel() {
+    fun loadUser() {
+        viewModelScope.launch {
+            val user = repository.getUser()
+            _state.value = user         // ← 这里可能崩？
+        }
+    }
+}
+// repository.getUser() 是: suspend fun getUser() = api.fetchUser()</code></pre>
+        <p><strong>诊断：</strong><code>repository.getUser()</code> 没有用 <code>withContext(Dispatchers.IO)</code> 包裹，在 Main 线程执行网络请求会 NetworkOnMainThreadException。<code>viewModelScope</code> 底层是 Dispatchers.Main，launch 启动的协程默认继承父的 Dispatcher = Main。解决方案：Repository 内部应该自己切到 IO，调用方不需要关心线程。</p>
+      </div></div>
+      <div class="qa"><button type="button">进阶 2：这个 Flow 会重复请求多少次？</button><div class="answer">
+<pre><code class="language-kotlin">// Activity 中四个地方都在 collect 同一个 Flow
+// 会发生什么？
+class MyActivity : AppCompatActivity() {
+    val flow = repository.userFlow()   // flow { emit(api.fetch()) }
+    
+    override fun onCreate() {
+        lifecycleScope.launch { flow.collect { update1(it) } }
+        lifecycleScope.launch { flow.collect { update2(it) } }
+        lifecycleScope.launch { flow.collect { update3(it) } }
+        lifecycleScope.launch { flow.collect { update4(it) } }
+    }
+}</code></pre>
+        <p><strong>诊断：</strong>每个 collect 都会触发一次完整的网络请求——一共 4 次！因为 <code>userFlow()</code> 是冷流，每个收集者独立。解决方案：用 <code>stateIn(scope)</code> 把冷流转成热流，或 <code>shareIn(scope)</code> 共享给多个收集者。</p>
+      </div></div>
+      <div class="qa"><button type="button">进阶 3：猜猜这段代码输出什么？</button><div class="answer">
+<pre><code class="language-kotlin">runBlocking {
+    val job = launch(Dispatchers.Default) {
+        try {
+            delay(100)
+            println("1")
+        } finally {
+            println("2")
+        }
+    }
+    delay(10)
+    job.cancelAndJoin()
+    println("3")
+}</code></pre>
+        <p><strong>输出：2、3。</strong>不会输出 1——cancel 在 delay(100) 完成之前就触发了，协程在 delay 这个挂起点检测到取消。finally 仍然执行（输出 2），然后协程终止。3 在 cancelAndJoin 之后输出。</p>
+      </div></div>
+      <div class="qa"><button type="button">进阶 4：同一个 scope 中 launch 和 async 混用会怎样？</button><div class="answer">
+<pre><code class="language-kotlin">coroutineScope {
+    val d1 = async { throw RuntimeException("A") }
+    val d2 = async { delay(100); println("B") }
+    try { d1.await() } catch (e: Exception) {}
+    d2.await()   // ← 这里会怎样？
+}</code></pre>
+        <p><strong>d2.await() 会抛异常。</strong>虽然 d1 的异常被 try/catch 吃掉了，但 d1 的 Job 在抛异常时已经失败了。普通 coroutineScope 下，一个子 Job 失败会取消父 Job，父 Job 取消 d2——所以 d2 在被 cancel 后 await 会抛 CancellationException。如果改成 supervisorScope，d2 不受影响，能正常打印 "B"。</p>
       </div></div>
     </section>
 
