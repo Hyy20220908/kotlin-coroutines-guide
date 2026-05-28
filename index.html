@@ -424,14 +424,18 @@ td{color:var(--muted)}
       <div class="nav-section">
         <span class="nav-kicker">Core</span>
         <a href="#suspend">suspend 与状态机</a>
+        <a href="#suspend-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 状态机源码追踪</a>
         <a href="#context">Scope / Context / Dispatcher</a>
+        <a href="#context-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 架构图与源码追踪</a>
         <a href="#structured">结构化并发与取消</a>
+        <a href="#structured-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ JobSupport 源码追踪</a>
         <a href="#exceptions">异常处理体系</a>
-        <a href="#source-map">源码导读</a>
+        <a href="#exceptions-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 异常传播与CEH源码</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Flow</span>
         <a href="#flow">Flow 冷流与热流</a>
+        <a href="#flow-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ SafeFlow 源码追踪</a>
         <a href="#stateflow">StateFlow / SharedFlow</a>
       </div>
       <div class="nav-section">
@@ -687,6 +691,59 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
       </div>
     </section>
 
+    <!-- ===== 补充：suspend 源码深入 ===== -->
+    <section class="section" id="suspend-deep">
+      <h2>源码追踪：suspend 函数如何变成状态机</h2>
+      <p class="lead">下面从编译器的角度，用一个完整的伪代码示例追踪 <code>suspend fun</code> → 状态机 → COROUTINE_SUSPENDED → resumeWith 的全链路。</p>
+      <div class="chapter">
+        <h3>一个极简挂起函数被编译后长什么样</h3>
+<pre><code class="language-kotlin">// === 你写的源码 ===
+suspend fun simpleSuspend(): String {
+    delay(1000)
+    return "done"
+}
+
+// === 编译器等价生成（简化伪代码） ===
+class SimpleSuspendSM(
+    private val completion: Continuation&lt;String&gt;
+) : Continuation&lt;Any?&gt; {
+    var label = 0
+    var result: Any? = null
+    override val context = completion.context
+
+    override fun resumeWith(result: Result&lt;Any?&gt;) {
+        this.result = result.getOrNull()
+        val outcome = invokeSuspend()
+        if (outcome != COROUTINE_SUSPENDED) {
+            completion.resumeWith(Result.success(outcome as String))
+        }
+    }
+
+    fun invokeSuspend(): Any? {
+        when (label) {
+            0 -&gt; {
+                label = 1
+                val r = delay(1000, this)           // 把自己作为 Continuation 传入
+                if (r == COROUTINE_SUSPENDED) return COROUTINE_SUSPENDED
+            }
+            1 -&gt; { return "done" }
+        }
+        error("unreachable")
+    }
+}</code></pre>
+        <h3>执行流程六步追踪</h3>
+        <div class="path">
+          <div class="path-step"><h3>① 首次调用</h3><p>创建 <code>SimpleSuspendSM</code>，<code>label = 0</code>，调用 <code>invokeSuspend()</code>。</p></div>
+          <div class="path-step"><h3>② 进入标签0</h3><p><code>label = 1</code>（保存恢复点），调用 <code>delay(1000, this)</code>，把自己（Continuation）传给 delay。</p></div>
+          <div class="path-step"><h3>③ delay 返回 COROUTINE_SUSPENDED</h3><p><code>invokeSuspend()</code> 也返回它 → 线程被释放，可以干别的事。</p></div>
+          <div class="path-step"><h3>④ 1 秒后定时器触发回调</h3><p>delay 内部调用 <code>this.resumeWith(Result.success(Unit))</code>。注意：这个 this 就是状态机对象自己！</p></div>
+          <div class="path-step"><h3>⑤ resumeWith 驱动状态机</h3><p><code>resumeWith</code> 保存结果，再次调用 <code>invokeSuspend()</code> → <code>label = 1</code> → 走标签1 → 返回 <code>"done"</code>。</p></div>
+          <div class="path-step"><h3>⑥ 完成</h3><p>不是 <code>COROUTINE_SUSPENDED</code> → <code>completion.resumeWith("done")</code> → 调用方拿到结果。</p></div>
+        </div>
+        <div class="tip"><strong>核心理解：</strong>状态机对象 <strong>同时是 Continuation 和回调</strong>——delay 完成时回调的是它自己，它在 <code>resumeWith</code> 里再驱动状态机继续。这就是协程"挂起-恢复"循环的本质。</div>
+      </div>
+    </section>
+
     <section class="section" id="context">
       <h2>Scope / Context / Dispatcher：协程的控制面</h2>
       <p class="lead">协程 API 看起来很多，但控制面可以压缩成三句话：Scope 管生命周期，Context 装配置，Dispatcher 管线程调度。</p>
@@ -730,6 +787,89 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
     }
 }</code></pre>
       <div class="tip"><strong>架构建议：</strong>Repository 或 UseCase 内部自己切到合适 Dispatcher，让调用方不用关心底层是网络、数据库还是 CPU 计算。为了测试可控，Dispatcher 应该可注入。</div>
+    </section>
+
+    <!-- ===== 补充：Scope/Context/Dispatcher 架构图与源码 ===== -->
+    <section class="section" id="context-deep">
+      <h2>架构图与源码追踪：Context、Dispatcher 的类层级全貌</h2>
+      <p class="lead">下面把 Scope、Context、Dispatcher 的类关系和核心源码一次性展开，帮你建立"面试能画出来"的 mental model。</p>
+
+      <h3>三层架构关系图</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 680 360" width="100%" role="img" aria-label="Scope/Context/Dispatcher 三层架构">
+          <rect x="30" y="15" width="620" height="65" rx="12" fill="#EEEDFE" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="340" y="40" text-anchor="middle" fill="#26215C" font-size="14" font-weight="700">CoroutineScope — "管理者" (唯一定义: val coroutineContext)</text>
+          <text x="340" y="60" text-anchor="middle" fill="#534AB7" font-size="11">launch / async 都是 scope 的扩展函数，scope 本身只是 context 容器</text>
+          <rect x="70" y="95" width="540" height="110" rx="12" fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.5"/>
+          <text x="340" y="120" text-anchor="middle" fill="#04342C" font-size="14" font-weight="700">CoroutineContext — "配置集" (CombinedContext 链表, 不可变)</text>
+          <rect x="100" y="138" width="100" height="36" rx="8" fill="#FAECE7" stroke="#D85A30" stroke-width="0.5"/><text x="150" y="158" text-anchor="middle" fill="#4A1B0C" font-size="12" font-weight="600">Job</text>
+          <rect x="220" y="138" width="120" height="36" rx="8" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/><text x="280" y="158" text-anchor="middle" fill="#042C53" font-size="12" font-weight="600">Dispatcher</text>
+          <rect x="360" y="138" width="120" height="36" rx="8" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/><text x="420" y="158" text-anchor="middle" fill="#173404" font-size="11" font-weight="600">CoroutineName</text>
+          <rect x="500" y="138" width="90" height="36" rx="8" fill="#FBEAF0" stroke="#D4537E" stroke-width="0.5"/><text x="545" y="158" text-anchor="middle" fill="#4B1528" font-size="11" font-weight="600">CEH</text>
+          <rect x="180" y="220" width="320" height="120" rx="10" fill="#E6F1FB" stroke="#378ADD" stroke-width="1"/>
+          <text x="340" y="245" text-anchor="middle" fill="#042C53" font-size="13" font-weight="700">CoroutineDispatcher — 线程调度器</text>
+          <text x="340" y="265" text-anchor="middle" fill="#185FA5" font-size="11">Default · IO · Main · Unconfined · limitedParallelism</text>
+          <text x="340" y="288" text-anchor="middle" fill="#185FA5" font-size="11">interceptContinuation 创建 DispatchedContinuation 包装原始 Continuation</text>
+          <text x="340" y="310" text-anchor="middle" fill="#185FA5" font-size="11">dispatch(context, block=Runnable) → 提交到线程池</text>
+          <line x1="180" y1="95" x2="270" y2="78" stroke="#534AB7" stroke-width="1"/><line x1="280" y1="220" x2="310" y2="200" stroke="#185FA5" stroke-width="1" stroke-dasharray="4,3"/>
+        </svg>
+      </div>
+
+      <h3>CoroutineContext 链表源码分析</h3>
+      <p>面试如果只回答"Context 是配置集合"不够。源码告诉你它是一个 <strong>不可变的、用 Key 索引的链表</strong>，CombinedContext 是真实数据结构：</p>
+<pre><code class="language-kotlin">// 内部实现: CombinedContext (极简版)
+internal class CombinedContext(
+    private val left: CoroutineContext,     // 指向前一个节点
+    private val element: Element             // 当前存的 Element
+) : CoroutineContext {
+    
+    override fun &lt;E : Element&gt; get(key: Key&lt;E&gt;): E? {
+        var cur = this
+        while (cur is CombinedContext) {
+            cur.element[key]?.let { return it }   // 当前节点匹配就返回
+            cur = cur.left                         // 否则向左遍历
+        }
+        return cur[key]  // 到达单Element 或 Empty
+    }
+}</code></pre>
+      <div class="note"><strong>面试追问——为什么不用 HashMap?</strong><br>① Element 极少（3-5个），链表 O(n) 开销可忽略<br>② 内存占用极小：每个节点只存 left+element 两个引用<br>③ 不可变链表插入 O(1)，+ 操作在头部追加即可</div>
+
+      <h3>CoroutineDispatcher 与 DispatchedContinuation</h3>
+      <p>Dispatcher 不是"主动调度协程"，而是被 <code>ContinuationInterceptor</code> 接口<strong>被动钩入</strong>协程恢复流程：</p>
+<pre><code class="language-kotlin">// 每次启动或恢复时, .intercepted() 找到 Dispatcher 把原始 Continuation 包一层
+override fun &lt;T&gt; interceptContinuation(continuation: Continuation&lt;T&gt;): Continuation&lt;T&gt; =
+    DispatchedContinuation(this, continuation)
+
+// DispatchedContinuation 同时是 Continuation 和 Runnable 
+class DispatchedContinuation&lt;T&gt;(
+    val dispatcher: CoroutineDispatcher,
+    val continuation: Continuation&lt;T&gt;
+) : DispatchedTask&lt;T&gt;(...), Continuation&lt;T&gt; by continuation {
+    
+    override fun resumeWith(result: Result&lt;T&gt;) {
+        if (dispatcher.isDispatchNeeded(context)) {
+            dispatcher.dispatch(context, this)  // this=Runnable → 提交到线程池
+        } else {
+            executeUnconfined(...)              // Unconfined 直接执行
+        }
+    }
+    
+    override fun run() {
+        continuation.resumeWith(takeState().toResult())  // 线程池执行的入口
+    }
+}</code></pre>
+      <div class="tip"><strong>核心模型：</strong>DispatchedContinuation = 快递包裹。它既是 Continuation（对上层透明），又是 Runnable（可被线程池投递）。<code>dispatch(context, this)</code> 把自己扔进线程池 → 线程池调用 <code>run()</code> → 内部调用真正的 <code>continuation.resumeWith</code>。</div>
+
+      <h3>经典用法调用链: launch(Dispatchers.IO) {} 七步追踪</h3>
+      <div class="path">
+        <div class="path-step"><h3>① newCoroutineContext</h3><p>合并父 Context + 传入的 Dispatchers.IO，新建子 Job 挂到父 Job.children</p></div>
+        <div class="path-step"><h3>② StandaloneCoroutine 创建</h3><p>AbstractCoroutine 对象既是 Continuation 又是 Job</p></div>
+        <div class="path-step"><h3>③ coroutine.start(DEFAULT)</h3><p>触发 block.startCoroutineCancellable(receiver, coroutine)</p></div>
+        <div class="path-step"><h3>④ createCoroutineUnintercepted</h3><p>编译器生成的状态机 Continuation</p></div>
+        <div class="path-step"><h3>⑤ .intercepted() ← Dispatcher 唯一切入点</h3><p>context[ContinuationInterceptor]?.interceptContinuation(原始Cont) = new DispatchedContinuation(IO, 原始Cont)</p></div>
+        <div class="path-step"><h3>⑥ resumeCancellableWith(Result.success(Unit))</h3><p>检查 isDispatchNeeded = true → dispatcher.dispatch(context, this) → 提交给弹性线程池</p></div>
+        <div class="path-step"><h3>⑦ 线程池执行 run()</h3><p>→ 原始Continuation.resumeWith() → 状态机在 IO 线程执行 body</p></div>
+      </div>
     </section>
 
     <section class="section" id="structured">
@@ -795,6 +935,55 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
       <div class="warn"><strong>高频坑：</strong><code>cancel()</code> 只是设置取消状态。协程需要在挂起点、<code>ensureActive()</code>、<code>yield()</code> 或检查 <code>isActive</code> 时响应。纯 CPU while 循环如果不主动检查，可能无法及时取消。</div>
     </section>
 
+    <!-- ===== 补充：JobSupport 状态机与取消传播源码 ===== -->
+    <section class="section" id="structured-deep">
+      <h2>源码追踪：JobSupport 状态机与取消传播链路</h2>
+      <p class="lead">JobSupport 用一个 AtomicReference 字段同时承担状态标记、子节点链表头、锁三种角色。下面逐行拆解。</p>
+      <div class="chapter">
+        <h3>JobSupport._state——单字段三用</h3>
+        <p>很多人以为 Job 的状态是一个简单的 enum。源码里它是一个 <code>AtomicReference&lt;Any?&gt;</code>——既存状态值，也存子节点链表：</p>
+<pre><code class="language-kotlin">// JobSupport (简化)
+public open class JobSupport : Job, ChildJob, ParentJob {
+    private val _state = AtomicReference&lt;Any?&gt;(EMPTY_ACTIVE)
+    // _state 的可能值:
+    // - EMPTY_ACTIVE / EMPTY_NEW    → 活跃，还没子节点
+    // - IncompleteList / NodeList    → 活跃，有子节点(链表)
+    // - CompletedExceptionally/...  → 完成状态
+    // - Cancelling / Cancelled      → 取消状态
+}</code></pre>
+        <h3>取消传播的递归入口：cancelImpl</h3>
+<pre><code class="language-kotlin">// cancelImpl 核心逻辑
+internal fun cancelImpl(cause: Any?): Boolean {
+    var finalState: Any? = cause
+    // 1. CAS 把状态改成 Cancelling; 如果已不可取消, 返回 false
+    // 2. 遍历 children 链表, 对每个 childJob 递归调用 cancelImpl
+    var child = firstChild(state)
+    while (child != null) {
+        child.childJob.cancelImpl(cause)   // 深度优先，一直到底
+        child = child.nextSibling
+    }
+    return true
+}</code></pre>
+        <p>取消是深度优先的递归：父取消 → 遍历所有直接子 → 每个子取消它的子 → ... → 最底层的协程在下一个挂起点抛 CancellationException。</p>
+        <h3>ChildHandleNode——父子连接的桥梁</h3>
+<pre><code class="language-kotlin">internal class ChildHandleNode(
+    private val parent: JobSupport,
+    private val child: ChildJob
+) : ChildHandle, CompletionHandler {
+    // 父完成时的回调 → 如果父是被取消的, 通知子
+    override fun invoke(cause: Throwable?) {
+        child.parentCancelled(cause)
+    }
+    // 子完成/异常时的回调 → 如果子是非取消异常, 通知父
+    override fun childCancelled(cause: Throwable?): Boolean {
+        if (cause is CancellationException) return true  // 取消不传播
+        return parent.childCancelled(cause)              // 真正异常→向上传播
+    }
+}</code></pre>
+        <div class="warn"><strong>SupervisorJob 一言：</strong>覆写了 <code>childCancelled</code> 直接返回 <code>false</code>（"子异常不传播给父"），这就是 supervisorScope 能隔离故障的源码本源。</div>
+      </div>
+    </section>
+
     <section class="section" id="exceptions">
       <h2>异常处理体系：launch、async、CEH 不能混着背</h2>
       <p class="lead">协程异常面试最爱问，因为很多错误代码能跑，但生命周期和错误边界全是隐患。</p>
@@ -855,7 +1044,38 @@ try {
 } catch (t: Throwable) {
     logger.log(t)
 }</code></pre>
-      <div class="note"><strong>面试表达模板：</strong><code>CoroutineExceptionHandler</code> 只处理“未被消费的根协程异常”。它不是 try/catch 的替代品，也不会处理 <code>async</code> 已经封装到 Deferred 里的异常。业务可恢复错误应该在业务边界 catch，CEH 更像最后兜底日志。</div>
+      <div class="note"><strong>面试表达模板：</strong><code>CoroutineExceptionHandler</code> 只处理"未被消费的根协程异常"。它不是 try/catch 的替代品，也不会处理 <code>async</code> 已经封装到 Deferred 里的异常。业务可恢复错误应该在业务边界 catch，CEH 更像最后兜底日志。</div>
+    </section>
+
+    <!-- ===== 补充：异常传播源码与 CEH 机制 ===== -->
+    <section class="section" id="exceptions-deep">
+      <h2>源码追踪：childCancelled 与 CEH 的内部机制</h2>
+      <div class="chapter">
+        <h3>子 → 父异常传播的源码</h3>
+<pre><code class="language-kotlin">// JobSupport.childCancelled —— 异常从子到父的入口
+public open fun childCancelled(cause: Throwable): Boolean {
+    if (cause is CancellationException) return true      // 取消不算异常
+    return cancelImpl(cause) &amp;&amp; handlesException           // 真正异常 → 取消父
+}
+
+// SupervisorJobImpl —— 覆写了 childCancelled, 阻止向上传播
+override fun childCancelled(cause: Throwable): Boolean = false  // "不传播"</code></pre>
+        <h3>异常到达根协程后的路径</h3>
+<pre><code class="language-kotlin">// handleCoroutineException —— 根协程的异常处理器查找
+public fun handleCoroutineException(context: CoroutineContext, exception: Throwable) {
+    try {
+        context[CoroutineExceptionHandler]?.let {      // 只在根的 Context 里找 CEH
+            it.handleException(context, exception)      // 找到 → 调用 CEH
+            return
+        }
+    } catch (t: Throwable) {}
+    // 找不到 → 交给线程的 UncaughtExceptionHandler → 通常 crash
+    currentThread().uncaughtExceptionHandler.uncaughtException(currentThread(), exception)
+}</code></pre>
+        <div class="warn"><strong>为什么子协程上的 CEH 无效？</strong>异常沿 Job 树向上传播到达根节点时，<code>handleCoroutineException</code> 在<strong>根协程的 Context 中</strong>查找 CEH。子协程的 Context 不在查找范围内。所以 CEH 必须设在 Scope 根协程或 launch 的根协程 Context 上。</div>
+        <h3>async 异常为什么 CEH 拿不到</h3>
+        <p><code>async</code> 创建的 DeferredCoroutine 覆写了 <code>handleJobException</code>，异常发生时不是调用 cancelImpl 传播，而是把异常<strong>存到内部 state 里</strong>，等 <code>await()</code> 时再重新抛出。所以异常不沿 Job 树向上传播，父 Job 不知道，CEH 也拿不到。</p>
+      </div>
     </section>
 
     <section class="section" id="source-map">
@@ -946,6 +1166,66 @@ val state = _state.asStateFlow()</code></pre>
     .onEach { render(it) }       // Main，取决于 collect 所在协程
     .launchIn(viewModelScope)</code></pre>
       <div class="warn"><strong>不要在 <code>flow {}</code> 里随意 <code>withContext</code> 发射数据。</strong>Flow 有上下文保持规则，上游线程切换应该通过 <code>flowOn</code> 表达，这样异常、取消和背压语义更清晰。</div>
+    </section>
+
+    <!-- ===== 补充：Flow 源码与操作符链追踪 ===== -->
+    <section class="section" id="flow-deep">
+      <h2>源码追踪：SafeFlow 实现与操作符链执行模型</h2>
+      <div class="chapter">
+        <h3>flow {} 底层是什么——SafeFlow 源码</h3>
+<pre><code class="language-kotlin">// flow {} 创建的就是一个 SafeFlow 对象
+private class SafeFlow&lt;T&gt;(private val block: suspend FlowCollector&lt;T&gt;.() -&gt; Unit) 
+    : AbstractFlow&lt;T&gt;() {
+    
+    override suspend fun collectSafely(collector: FlowCollector&lt;T&gt;) {
+        collector.block()   // 你的 emit(1); emit(2) 在这里执行
+    }
+}
+
+// collect 方法最终调用
+override suspend fun collect(collector: FlowCollector&lt;T&gt;) {
+    val safeCollector = SafeCollector(collector, coroutineContext)
+    collectSafely(safeCollector)   // SafeCollector 做了上下文一致性检查
+}</code></pre>
+        <p><strong>这意味着：</strong>每次 <code>collect</code> 都重新执行一遍你的 block。每个收集者是独立的。emit 内部检查取消状态。</p>
+
+        <h3>操作符链本质——装饰器模式</h3>
+<pre><code class="language-kotlin">// 每个操作符都是一个包装的 Flow + 包装的 Collector
+flow { emit(1); emit(2) }
+    .map { it * 10 }
+    .filter { it &gt; 5 }
+    .collect { println(it) }
+
+// collect 从尾到头建立链:
+// collect 包装 collector → filterFlow.collect(wrappedCollector)
+// → mapFlow.collect(wrappedCollector)  
+// → 原始 flow.collect(finalCollector)
+// → 开始执行 block → emit(1) → map→10 → filter→通过 → collect打印 → emit(2) → ...</code></pre>
+        <div class="tip"><strong>关键：这是一个同步的管道</strong>——emit 在 collect 处理完当前值之前不会 emit 下一个值。这是 Flow 默认的背压机制。</div>
+
+        <h3>flowOn 内部——基于 Channel 的线程切换</h3>
+<pre><code class="language-kotlin">// flowOn 的实现原理：把上游 Flow 包进 channelFlow
+fun &lt;T&gt; Flow&lt;T&gt;.flowOn(context: CoroutineContext): Flow&lt;T&gt; = channelFlow {
+    collect { value -&gt;
+        send(value)           // 上游在指定线程 emit，通过 Channel 发送给下游
+    }
+}.buffer(Channel.RENDEZVOUS)  // 默认无缓冲
+
+// 下游 collect 从同一个 Channel receive，在自己的线程执行</code></pre>
+        <p>这也解释了为什么<strong>Flow 内部不能用 withContext</strong>——FlowCollector 接口设计就是单上下文执行的，跨上下文会触发异常。</p>
+
+        <h3>StateFlow.value 赋值时的内部链路</h3>
+<pre><code class="language-kotlin">// _uiState.value = newValue 底层发生了什么:
+override var value: T
+    get() = _state.value                         // 直接从 atomic 字段读
+    set(value) {
+        _state.value = value                     // 1. CAS 更新值
+        for (collector in collectors) {           // 2. 遍历所有收集者
+            collector.offer(value)                // 3. 每个收集者通过 Channel 发送新值
+        }
+        // StateFlow 自带去重: 新值和旧值 equals 相同时不通知
+    }</code></pre>
+      </div>
     </section>
 
     <section class="section" id="stateflow">
@@ -1348,6 +1628,13 @@ class Repo(
       <div class="qa"><button type="button">14. 如何并发请求两个接口并合并结果？</button><div class="answer">在 coroutineScope 中用 async 启动两个子任务，再 await 合并。这样外层会等待所有子任务；任何一个失败会取消另一个并把异常抛给调用方。如果希望部分失败可用，用 supervisorScope + runCatching。</div></div>
       <div class="qa"><button type="button">15. 取消为什么要重新抛 CancellationException？</button><div class="answer">CancellationException 是协程取消的正常信号。如果 catch Throwable 后吞掉它，父协程以为任务正常完成，取消传播被破坏，可能导致资源继续运行或状态错误。</div></div>
       <div class="qa"><button type="button">16. 如何测试 delay 和 Dispatcher？</button><div class="answer">使用 kotlinx-coroutines-test 的 runTest、TestDispatcher 和 TestScheduler。生产代码通过构造函数注入 Dispatcher，测试中替换为 StandardTestDispatcher，再用 advanceUntilIdle 或 advanceTimeBy 推进虚拟时间。</div></div>
+
+      <h3>源码级追问（面试加分题）</h3>
+      <div class="qa"><button type="button">17. CoroutineContext 为什么用链表不用 HashMap？（源码题）</button><div class="answer"><strong>三原因：</strong>①数量级：协程 Context 通常 3-5 个 Element，O(n) 遍历开销可忽略；②内存：CombinedContext 每节点只存 left + element 两个引用，HashMap 需要初始化数组池；③不可变性：链表头部插入 O(1)，HashMap 不可变操作需全量复制。源码中 <code>CombinedContext.get(key)</code> 是一个 while 循环向左遍历，直到找到匹配 Key 的 Element 或到达链表尾部。</div></div>
+      <div class="qa"><button type="button">18. Dispatcher 通过什么接口切入协程执行？（源码题）</button><div class="answer">通过 <code>ContinuationInterceptor</code> 接口的 <code>interceptContinuation()</code> 方法。每次协程启动或挂起恢复时，调用 <code>.intercepted()</code> → 查找 Context 中的 ContinuationInterceptor → <code>interceptContinuation(原始Cont) = DispatchedContinuation(dispatcher, 原始Cont)</code>。DispatchedContinuation 同时实现 Continuation（对上层透明）和 Runnable（可被线程池执行），在 <code>resumeWith</code> 中检查 <code>isDispatchNeeded</code>，需要时调用 <code>dispatch(context, this)</code> 把自己提交到线程池。</div></div>
+      <div class="qa"><button type="button">19. SupervisorJob 的 childCancelled 返回什么？为什么？（源码题）</button><div class="answer">返回 <code>false</code>。源码中 <code>SupervisorJobImpl.childCancelled</code> 直接 return false，意思是"子异常，我不处理，不取消自己"。对照普通 Job 的 childCancelled 会调用 <code>cancelImpl(cause) &amp;&amp; handlesException</code> 取消父 Job。这一行代码的差异就是 coroutineScope（双向传播）和 supervisorScope（单向不传播）的本质区别。</div></div>
+      <div class="qa"><button type="button">20. DispatchedContinuation 为什么既是 Continuation 又是 Runnable？</button><div class="answer">这是协程调度机制最精巧的设计。<strong>外观上</strong>，它通过 <code>by continuation</code> 委托给原始 Continuation，对上层透明；<strong>内部</strong>，它继承 <code>DispatchedTask</code>（实现了 Runnable），可以在 <code>resumeWith</code> 中调用 <code>dispatcher.dispatch(context, this)</code> 把自己投递到线程池。线程池拿到后执行 <code>run()</code>，内部调用 <code>continuation.resumeWith(result)</code>。类比：DispatchedContinuation 是"快递包裹"——既是包裹（Continuation），又是可被投递的包裹（Runnable）。</div></div>
+      <div class="qa"><button type="button">21. JobSupport._state 一个字段为什么能同时表达状态和子节点链表？</button><div class="answer">因为 <code>_state</code> 类型是 <code>AtomicReference&lt;Any?&gt;</code>——不限定类型。活跃状态时它存 <code>IncompleteList</code>（链表头 + 状态标记），完成状态时存 <code>CompletedExceptionally</code> 或最终结果。这种"一个字段多义"的设计是为了极致的零分配优化——不额外开辟 HashMap 或 ArrayList 来存子节点，状态流转也能用 CAS 原子操作高效完成。</div></div>
     </section>
 
     <section class="section" id="interview-drill">
