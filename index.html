@@ -404,9 +404,119 @@ td{color:var(--muted)}
   .diagram svg{min-width:620px}
   pre{font-size:12px;white-space:pre}
 }
+
+/* ===== 排版优化 ===== */
+
+/* --- 章节交替背景 --- */
+.section:nth-child(odd){background:rgba(255,255,255,.006)}
+.section:nth-child(even){background:rgba(255,255,255,.012)}
+
+/* --- 源码追踪章节 --- */
+.section.source-deep{
+  border-left:3px solid var(--accent-2);
+  padding-left:calc(clamp(20px,5vw,72px) - 3px);
+  background:rgba(122,167,255,.02);
+}
+.section.source-deep h2{
+  color:var(--accent-2);
+}
+
+/* --- H2 标题装饰 --- */
+.section h2{
+  position:relative;
+  padding-bottom:14px;
+}
+.section h2::after{
+  content:"";
+  position:absolute;
+  left:0;
+  bottom:0;
+  width:48px;
+  height:3px;
+  border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),transparent);
+}
+.section.source-deep h2::after{
+  background:linear-gradient(90deg,var(--accent-2),transparent);
+}
+
+/* --- 卡片 hover 微动效 --- */
+.card{
+  transition:border-color .2s,box-shadow .2s,transform .2s;
+}
+.card:hover{
+  border-color:rgba(101,215,196,.28);
+  box-shadow:0 4px 24px rgba(0,0,0,.18);
+  transform:translateY(-1px);
+}
+
+/* --- 表格斑马纹 --- */
+table tr:nth-child(even){background:rgba(255,255,255,.018)}
+table tr:hover{background:rgba(101,215,196,.04)}
+
+/* --- 图表容器 --- */
+.diagram{
+  background:#f9fcff;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.04);
+}
+
+/* --- 滚动进度条 --- */
+.progress-bar{
+  position:fixed;
+  top:0;left:0;
+  height:3px;
+  z-index:999;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  transition:width .15s linear;
+}
+
+/* --- 大区块分隔 --- */
+.part-divider{
+  max-width:980px;
+  margin:0 auto;
+  padding:0 clamp(20px,5vw,72px);
+  color:var(--subtle);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  border-bottom:1px solid var(--line-soft);
+  line-height:0;
+  text-align:center;
+}
+.part-divider span{
+  display:inline-block;
+  padding:0 16px;
+  background:linear-gradient(180deg,transparent 48%,var(--bg) 48%,var(--bg) 52%,transparent 52%);
+}
+
+/* --- 顶部导航栏细微优化 --- */
+.sidebar{
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+
+/* --- 底部 footer 增强 --- */
+.footer{
+  display:flex;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+/* --- 移动端补充 --- */
+@media(max-width:760px){
+  .section.source-deep{
+    border-left:0;
+    border-top:3px solid var(--accent-2);
+    padding-left:18px;
+  }
+  .progress-bar{height:2px}
+}
 </style>
 </head>
 <body>
+<div class="progress-bar" id="progressBar"></div>
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
@@ -514,7 +624,7 @@ td{color:var(--muted)}
     </section>
 
     <section class="section" id="why-coroutines">
-      <h2>为什么需要协程：它解决的不是“少写线程”，而是异步控制权</h2>
+      <h2>为什么需要协程</h2>
       <div class="chapter">
         <p>学习协程之前，先不要急着背 <code>launch</code>、<code>async</code>、<code>withContext</code>。更重要的问题是：Android 开发为什么会需要一种新的异步模型？答案不是“线程太重”这么简单，而是传统异步代码有三个长期痛点：线程会阻塞，回调会割裂控制流，后台任务很容易脱离页面生命周期。</p>
         <p>Android 的主线程负责绘制、事件分发和大部分 UI 状态更新。任何耗时操作，只要占住主线程太久，就会造成掉帧、卡顿甚至 ANR。于是我们把网络、数据库、文件读写放到后台线程。但线程 API 只解决了“在哪个线程执行”，没有解决“任务完成后如何回到原来的逻辑”“页面销毁后任务怎么办”“多个异步任务谁负责等待和取消”。协程真正补上的，就是这些控制权问题。</p>
@@ -776,7 +886,7 @@ fun loadUser(id: Long, cont: Continuation&lt;User&gt;): Any? {
     </section>
 
     <!-- ===== 补充：suspend 源码深入 ===== -->
-    <section class="section" id="suspend-deep">
+    <section class="section source-deep" id="suspend-deep">
       <h2>源码追踪：suspend 函数如何变成状态机</h2>
       <p class="lead">下面从编译器的角度，用一个完整的伪代码示例追踪 <code>suspend fun</code> → 状态机 → COROUTINE_SUSPENDED → resumeWith 的全链路。</p>
       <div class="chapter">
@@ -900,8 +1010,8 @@ class SimpleSuspendSM(
     </section>
 
     <!-- ===== 补充：Scope/Context/Dispatcher 架构图与源码 ===== -->
-    <section class="section" id="context-deep">
-      <h2>架构图与源码追踪：Context、Dispatcher 的类层级全貌</h2>
+    <section class="section source-deep" id="context-deep">
+      <h2>源码追踪：Context 与 Dispatcher 架构全貌</h2>
       <p class="lead">下面把 Scope、Context、Dispatcher 的类关系和核心源码一次性展开，帮你建立"面试能画出来"的 mental model。</p>
 
       <h3>三层架构关系图</h3>
@@ -1011,8 +1121,8 @@ class DispatchedContinuation&lt;T&gt;(
     </section>
 
     <!-- ===== CoroutineContext Element 完整清单 ===== -->
-    <section class="section" id="context-elements">
-      <h2>CoroutineContext Element 完整清单：你可以在 Context 里放什么</h2>
+    <section class="section source-deep" id="context-elements">
+      <h2>CoroutineContext Element 完整清单</h2>
       <p class="lead">Context 的 <code>+</code> 操作让你组合各种 Element。下面列出所有标准库中的 Element，以及每个 Element 的 Key 和作用域。</p>
       <table>
         <thead><tr><th>Element</th><th>Key</th><th>作用</th><th>典型用法</th></tr></thead>
@@ -1030,7 +1140,7 @@ class DispatchedContinuation&lt;T&gt;(
     </section>
 
     <!-- ===== 协程构建器完整对比 ===== -->
-    <section class="section" id="builder-compare">
+    <section class="section source-deep" id="builder-compare">
       <h2>所有协程构建器 / Scope 函数一表对比</h2>
       <p class="lead">面试里最容易搞混的就是"这个构建器到底会不会等子协程""异常怎么走""返回什么"。一张表全理清。</p>
       <table>
@@ -1111,7 +1221,7 @@ class DispatchedContinuation&lt;T&gt;(
     </section>
 
     <!-- ===== 补充：JobSupport 状态机与取消传播源码 ===== -->
-    <section class="section" id="structured-deep">
+    <section class="section source-deep" id="structured-deep">
       <h2>源码追踪：JobSupport 状态机与取消传播链路</h2>
       <p class="lead">JobSupport 用一个 AtomicReference 字段同时承担状态标记、子节点链表头、锁三种角色。下面逐行拆解。</p>
       <div class="chapter">
@@ -1223,7 +1333,7 @@ try {
     </section>
 
     <!-- ===== 补充：异常传播源码与 CEH 机制 ===== -->
-    <section class="section" id="exceptions-deep">
+    <section class="section source-deep" id="exceptions-deep">
       <h2>源码追踪：childCancelled 与 CEH 的内部机制</h2>
       <div class="chapter">
         <h3>子 → 父异常传播的源码</h3>
@@ -1381,7 +1491,7 @@ val state = _state.asStateFlow()</code></pre>
     </section>
 
     <!-- ===== 补充：Flow 源码与操作符链追踪 ===== -->
-    <section class="section" id="flow-deep">
+    <section class="section source-deep" id="flow-deep">
       <h2>源码追踪：SafeFlow 实现与操作符链执行模型</h2>
       <div class="chapter">
         <h3>flow {} 底层是什么——SafeFlow 源码</h3>
@@ -1441,7 +1551,7 @@ override var value: T
     </section>
 
     <!-- ===== Flow 操作符速查 ===== -->
-    <section class="section" id="flow-operators">
+    <section class="section source-deep" id="flow-operators">
       <h2>Flow 操作符速查：需要什么功能，找哪个操作符</h2>
       <div class="chapter">
         <div class="grid three">
@@ -1953,7 +2063,7 @@ fun loadUser_updatesState() = runTest {
 
     <!-- ===== 新增：Select 表达式 ===== -->
     <section class="section" id="select">
-      <h2>Select 表达式：同时等待多个挂起操作，谁先完成用谁</h2>
+      <h2>Select 表达式：谁先完成用谁</h2>
       <p class="lead">这是一个被低估的协程 API——它能让你同时监听多个 Channel 或 Deferred，选择最先完成的那个，并取消未完成的。</p>
       <div class="chapter">
         <h3>select 的核心语义</h3>
@@ -2463,6 +2573,7 @@ class MyActivity : AppCompatActivity() {
 
     <footer class="footer">
       <p>建议阅读方式：先按学习路线通读，再回到面试题区自测。真正写项目时，以 Android 落地架构、异常处理表和反模式清单作为代码审查 checklist。</p>
+      <p style="color:var(--subtle);font-size:12px">内容更新于 2026-05-28</p>
     </footer>
   </main>
 </div>
@@ -2470,6 +2581,14 @@ class MyActivity : AppCompatActivity() {
 <button class="top" id="topButton" type="button" aria-label="返回顶部">↑</button>
 
 <script>
+// 滚动进度条
+const progressBar = document.getElementById("progressBar");
+window.addEventListener("scroll", () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressBar.style.width = pct + "%";
+});
+
 const links = Array.from(document.querySelectorAll(".nav a"));
 const sections = links.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
 
