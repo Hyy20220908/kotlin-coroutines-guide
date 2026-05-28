@@ -437,6 +437,12 @@ td{color:var(--muted)}
         <a href="#flow">Flow 冷流与热流</a>
         <a href="#flow-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ SafeFlow 源码追踪</a>
         <a href="#stateflow">StateFlow / SharedFlow</a>
+        <a href="#channel">Channel 协程通信</a>
+      </div>
+      <div class="nav-section">
+        <span class="nav-kicker">Advanced</span>
+        <a href="#select">Select 表达式</a>
+        <a href="#coroutine-start">CoroutineStart 模式</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Android</span>
@@ -1295,6 +1301,79 @@ class ProfileViewModel(
       <div class="tip"><strong>Compose 侧建议：</strong>使用生命周期感知的收集方式，例如 <code>collectAsStateWithLifecycle()</code>。传统 View 侧使用 <code>repeatOnLifecycle</code>，避免页面不可见时仍然收集 UI 数据。</div>
     </section>
 
+    <!-- ===== 新增：Channel —— 协程间通信 ===== -->
+    <section class="section" id="channel">
+      <h2>Channel：协程之间的通信管道</h2>
+      <p class="lead">Flow 是"一个生产者对多个消费者的数据流"，Channel 是"协程到协程的点对点消息传递"。它弥补了 launch/async 无法在运行中的协程之间传递数据的问题。</p>
+      <div class="chapter">
+        <h3>Channel 解决什么问题？</h3>
+        <p>用 <code>launch</code> 启动多个协程后，如果生产者协程产出了数据需要实时发给消费者协程，该怎么办？全局变量不安全，Flow 适合声明式管道但不适合双向通信，<code>async/await</code> 只返回一个结果。Channel 就是为这个场景设计的——<strong>一个协程 send，另一个协程 receive，线程安全，自带挂起/恢复</strong>。</p>
+
+        <div class="compare">
+          <article class="card">
+            <span class="example-title">生产者-消费者模式</span>
+<pre><code class="language-kotlin">val channel = Channel&lt;Int&gt;(capacity = Channel.UNLIMITED)
+
+launch(Dispatchers.Default) {    // 生产者
+    for (i in 1..5) {
+        channel.send(i)
+        delay(100)
+    }
+    channel.close()               // 生产完毕后关闭
+}
+
+launch(Dispatchers.IO) {         // 消费者
+    for (value in channel) {     // 等价于 while(receive) 
+        process(value)
+    }
+}</code></pre>
+            <p><code>send()</code> 在 Channel 满时挂起；<code>receive()</code> 在 Channel 空时挂起。<code>channel.close()</code> 后消费者遍历自动结束。</p>
+          </article>
+        </div>
+
+        <h3>四种 Channel 类型的缓冲区策略</h3>
+        <table>
+          <thead><tr><th>类型</th><th>缓冲区</th><th>send 何时挂起</th><th>经典场景</th></tr></thead>
+          <tbody>
+            <tr><td><code>RENDEZVOUS</code></td><td>0（默认）</td><td>必须等消费者来 receive</td><td>严格同步、背压精确</td></tr>
+            <tr><td><code>BUFFERED</code></td><td>64</td><td>缓冲区满才挂起</td><td>吞吐优先、允许少量开销</td></tr>
+            <tr><td><code>CONFLATED</code></td><td>1（合并）</td><td>新值覆盖旧值</td><td>只关心最新值（如 UI 更新）</td></tr>
+            <tr><td><code>UNLIMITED</code></td><td>无限</td><td>永不挂起</td><td>消费者一定比生产者快的场景</td></tr>
+          </tbody>
+        </table>
+
+        <h3>fan-out 和 fan-in：多对多通信</h3>
+        <p>Channel 可以被多个消费者共享（fan-out），也可以由多个生产者写入（fan-in），但每个消息只会被一个消费者接收（非广播）。如果需要广播，用 <code>BroadcastChannel</code>（已废弃，推荐 SharedFlow）。</p>
+
+<pre><code class="language-kotlin">// Fan-out: 多个消费者竞争同一个 Channel
+val channel = Channel&lt;Int&gt;(BUFFERED)
+repeat(5) { 
+    launch(Dispatchers.Default) {
+        for (msg in channel) { process(it, msg) }
+    }
+}
+launch { repeat(10) { channel.send(it) }; channel.close() }
+// 10 个消息被 5 个消费者竞争处理</code></pre>
+
+        <h3>Channel 与 Flow 如何桥接</h3>
+<pre><code class="language-kotlin">// Channel → Flow
+val flow = channel.receiveAsFlow()
+
+// Flow → Channel
+flow.produceIn(scope)  // 返回 ReceiveChannel</code></pre>
+        <p><code>receiveAsFlow()</code> 把 Channel 包装成 Flow，多个收集者可以同时消费（实际上被 Channel 的消费语义限制，通常只单消费）。<code>produceIn</code> 反向桥接，让 Flow 的值灌入 Channel。</p>
+
+        <h3>源码摘要</h3>
+<pre><code class="language-kotlin">// Channel 接口极其简洁
+public interface Channel&lt;E&gt; : SendChannel&lt;E&gt;, ReceiveChannel&lt;E&gt; {
+    // SendChannel: send(element) / trySend / close
+    // ReceiveChannel: receive() / tryReceive / iterator
+    val capacity: Int
+}</code></pre>
+        <div class="note"><strong>性能提示：</strong>Channel 在协程间传递数据比 Flow 更直接（少了声明式操作符链的开销），但可以维护的状态更少。一般规则：<strong>单纯的协程到协程消息用 Channel，多消费者需要背压/操作符/变换的用 Flow。</strong></div>
+      </div>
+    </section>
+
     <section class="section" id="android">
       <h2>Android 落地架构：让协程待在正确的层</h2>
       <p class="lead">稳定的协程代码不是“哪里都 launch 一下”，而是每一层只承担自己的职责。</p>
@@ -1501,6 +1580,19 @@ fun loadUser_updatesState() = runTest {
     assertThat(vm.state.value.user?.name).isEqualTo("Ada")
 }</code></pre>
       <div class="warn"><strong>面试高频：</strong>为什么不建议在代码里硬编码 <code>Dispatchers.IO</code>？因为测试无法替换，虚拟时间无法控制，也不利于在不同平台或场景下调整调度策略。</div>
+
+      <h3>如何读懂协程的崩溃堆栈</h3>
+      <p>协程崩溃时的堆栈看起来很吓人，但有一个固定的"剥洋葱"套路：</p>
+<pre><code class="language-kotlin">// 一个典型协程崩溃堆栈的关键标志:
+// 1. 最上面是你自己代码的异常位置
+// 2. 中间是 kotlinx.coroutines 的调度层方法:
+//    BaseContinuationImpl.resumeWith        ← 状态机恢复
+//    DispatchedTask.run                     ← Dispatcher 调度
+//    CoroutineScheduler.runSafely           ← 线程池执行
+// 3. 最下面是 Java 线程池的底层调用
+
+// 关键: 找到你自己代码的行号就行，中间层可以忽略</code></pre>
+      <div class="tip"><strong>调试技巧：</strong>给每个协程设 <code>CoroutineName("loadUser")</code>，崩溃堆栈里就能看到这个名字。用 <code>Thread.currentThread().name</code> 在日志里打印当前线程，排查 Dispatcher 选错导致的线程问题。</div>
     </section>
 
     <section class="section" id="performance">
@@ -1549,6 +1641,103 @@ fun loadUser_updatesState() = runTest {
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )</code></pre>
+    </section>
+
+    <!-- ===== 新增：Select 表达式 ===== -->
+    <section class="section" id="select">
+      <h2>Select 表达式：同时等待多个挂起操作，谁先完成用谁</h2>
+      <p class="lead">这是一个被低估的协程 API——它能让你同时监听多个 Channel 或 Deferred，选择最先完成的那个，并取消未完成的。</p>
+      <div class="chapter">
+        <h3>select 的核心语义</h3>
+        <p>假设你同时发起两个网络请求，但只需要最快返回的那个结果。传统写法需要额外的变量、Job 管理、手动取消另一个。select 在语言层面解决了这个问题：</p>
+
+<pre><code class="language-kotlin">suspend fun fetchFastest(): Result = coroutineScope {
+    val deferred1 = async { api.sourceA() }
+    val deferred2 = async { api.sourceB() }
+    
+    select&lt;Result&gt; {
+        deferred1.onAwait { it }      // 如果 deferred1 先返回 → 选它
+        deferred2.onAwait { it }      // 如果 deferred2 先返回 → 选它
+    }.also {
+        // select 返回后，未被选中的 Deferred 自动被取消
+    }
+}</code></pre>
+
+        <h3>select 支持的操作</h3>
+        <table>
+          <thead><tr><th>操作</th><th>作用</th><th>示例</th></tr></thead>
+          <tbody>
+            <tr><td><code>onAwait {}</code></td><td>等待 Deferred 完成</td><td><code>deferred.onAwait { it }</code></td></tr>
+            <tr><td><code>onReceive {}</code></td><td>等待 Channel receive</td><td><code>channel.onReceive { it }</code></td></tr>
+            <tr><td><code>onSend(value) {}</code></td><td>等待 Channel send 成功</td><td><code>channel.onSend(data) { }</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>select 的实际应用场景</h3>
+<pre><code class="language-kotlin">// 场景1: 超时竞赛 —— 两个服务同时查，用快的
+val result = select {
+    async { cache.get(id) }.onAwait { "缓存命中: $it" }
+    async { network.fetch(id) }.onAwait { "网络命中: $it" }
+    onTimeout(200) { "两者都太慢，给兜底" }
+}
+
+// 场景2: 多 Channel 消费 —— 同时监听多个事件源
+select {
+    userEvents.onReceive { handleUserEvent(it) }
+    systemEvents.onReceive { handleSystemEvent(it) }
+    ticker.onReceive { handleTick() }
+}</code></pre>
+        <div class="note"><strong>select 是实验性 API，需要 <code>@OptIn(ExperimentalCoroutinesApi::class)</code>。</strong>它的内部实现用到协程底层的一次性 Continuation，选择一个分支后，其他分支的 Continuation 被取消。</div>
+
+        <h3>select 与 Channel 的经典配合：扇出消费</h3>
+<pre><code class="language-kotlin">// 多个 Channel 汇聚到同一个 select
+suspend fun consumeMulti(ch1: ReceiveChannel&lt;Int&gt;, ch2: ReceiveChannel&lt;String&gt;) {
+    while (!ch1.isClosedForReceive || !ch2.isClosedForReceive) {
+        select&lt;Unit&gt; {
+            ch1.onReceive { println("Channel1: $it") }
+            ch2.onReceive { println("Channel2: $it") }
+        }
+    }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ===== 新增：CoroutineStart 六种模式 ===== -->
+    <section class="section" id="coroutine-start">
+      <h2>CoroutineStart 六种模式：控制协程的启动时机</h2>
+      <p class="lead">99% 的场景用默认的 <code>DEFAULT</code> 就够了，但当你需要"懒加载协程"或"在启动的线程先执行一段"时，另外几种 Start 模式是关键。</p>
+      <div class="chapter">
+        <table>
+          <thead><tr><th>模式</th><th>行为</th><th>使用场景</th></tr></thead>
+          <tbody>
+            <tr><td><code>DEFAULT</code></td><td>立即调度到 Dispatcher</td><td>99% 的场景</td></tr>
+            <tr><td><code>LAZY</code></td><td>创建但不执行，等 start()/join()/await()</td><td>需要显式控制启动时机</td></tr>
+            <tr><td><code>ATOMIC</code></td><td>立即执行，但在第一个挂起点前不可取消</td><td>启动后必须至少执行到第一个挂起点</td></tr>
+            <tr><td><code>UNDISPATCHED</code></td><td>在当前线程直接执行到第一个挂起点，然后调度</td><td>优化：减少一次线程切换</td></tr>
+          </tbody>
+        </table>
+
+<pre><code class="language-kotlin">// LAZY: 显式控制启动，start() 后可多次调用
+val job = launch(start = CoroutineStart.LAZY) {
+    expensiveInit()
+}
+// 此时协程还没开始
+job.start()  // 现在才开始
+
+// ATOMIC: 第一个挂起点前不可取消
+val job = launch(start = CoroutineStart.ATOMIC) {
+    criticalSetup()    // cancel() 到这之前都无效
+    delay(100)         // 第一个挂起点，这里开始可以取消
+    restOfWork()
+}
+
+// UNDISPATCHED: 减少一次线程切换
+launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+    // 第一段代码在当前线程（可能是 Main）立即执行
+    // 遇到第一个挂起点后再切到 Default 线程池
+}</code></pre>
+        <div class="warn"><strong>UNDISPATCHED 陷阱：</strong>它在当前线程立即执行到第一个挂起点，这意味着如果你的调用线程是 Main 线程且 block 里有耗时操作，会卡 UI。慎用。</div>
+      </div>
     </section>
 
     <section class="section" id="exercise-lab">
