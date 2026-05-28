@@ -565,7 +565,24 @@ td{color:var(--muted)}
         <p><strong>第一层是语法层。</strong><code>suspend</code> 让函数可以挂起，<code>launch</code> 和 <code>async</code> 让你启动新的协程，<code>Flow</code> 让你描述一串异步数据。</p>
         <p><strong>第二层是运行时层。</strong>编译器生成状态机，Continuation 表示恢复点，Dispatcher 决定恢复在哪个线程，Job 维护任务状态、父子关系和取消传播。</p>
         <p><strong>第三层是架构层。</strong>在 Android 中，协程必须和 ViewModel、Lifecycle、Repository、UI 状态管理结合。否则你只是把回调换成了 <code>launch</code>，并没有真正解决生命周期和异常边界。</p>
-        <div class="tip"><strong>读后判断：</strong>如果你能解释“为什么 delay 不阻塞线程”“为什么 viewModelScope 能避免页面任务泄漏”“为什么协程代码看起来顺序但底层仍是回调恢复”，后面的状态机、Job 树和 Flow 才会真正串起来。</div>
+        <div class="tip"><strong>读后判断：</strong>如果你能解释"为什么 delay 不阻塞线程""为什么 viewModelScope 能避免页面任务泄漏""为什么协程代码看起来顺序但底层仍是回调恢复"，后面的状态机、Job 树和 Flow 才会真正串起来。</div>
+
+        <!-- 协程 vs 线程 vs RxJava 对比 -->
+        <h3>协程 vs 线程 vs RxJava：一张表看清谁解决什么问题</h3>
+        <p>协程、线程、RxJava 三者的关系不是"选一个丢掉其他的"，而是<strong>每层解决不同的问题</strong>——线程是操作系统级的并发单元，协程是语言级的异步编排，RxJava 是操作符驱动的响应式流。</p>
+        <table>
+          <thead><tr><th>维度</th><th>线程 (Thread)</th><th>RxJava</th><th>Kotlin 协程</th></tr></thead>
+          <tbody>
+            <tr><td><strong>抽象级别</strong></td><td>操作系统级，1-2MB 栈</td><td>操作符链，依赖库</td><td>语言级，编译器支持</td></tr>
+            <tr><td><strong>启动成本</strong></td><td>高：内核态切换、栈分配</td><td>中：对象分配、订阅链</td><td>极低：几 KB 的 Job + Continuation</td></tr>
+            <tr><td><strong>挂起/阻塞</strong></td><td>阻塞：线程卡住不能做别的</td><td>异步回调，线程可以被复用</td><td>挂起不阻塞：保存状态、释放线程</td></tr>
+            <tr><td><strong>错误处理</strong></td><td>try/catch 只在线程内</td><td>onError/onErrorReturn 链式</td><td>try/catch 对挂起代码直接有效；结构化异常传播</td></tr>
+            <tr><td><strong>取消/生命周期</strong></td><td>interrupt()不保证立刻停止</td><td>dispose()取消订阅，不自动绑定</td><td>结构化并发：取消自动级联；Scope绑定生命周期</td></tr>
+            <tr><td><strong>线程切换</strong></td><td>手动 submit/execute</td><td>subscribeOn/observeOn</td><td>withContext/flowOn，编译期上下文保持</td></tr>
+            <tr><td><strong>学习曲线</strong></td><td>低：概念简单，坑多</td><td>陡峭：100+操作符</td><td>中：挂起+结构化并发+Flow，概念数可控</td></tr>
+          </tbody>
+        </table>
+        <div class="info"><strong>结论：</strong>线程是基础设施（你仍然需要线程池），协程是并发编排（怎么组织异步任务），RxJava 擅长复杂事件流处理。现代 Android 推荐的组合是：<strong>协程做基础异步 + Flow 做响应式流 + 线程池做底层并发承载</strong>。</div>
       </div>
     </section>
 
@@ -747,6 +764,32 @@ class SimpleSuspendSM(
           <div class="path-step"><h3>⑥ 完成</h3><p>不是 <code>COROUTINE_SUSPENDED</code> → <code>completion.resumeWith("done")</code> → 调用方拿到结果。</p></div>
         </div>
         <div class="tip"><strong>核心理解：</strong>状态机对象 <strong>同时是 Continuation 和回调</strong>——delay 完成时回调的是它自己，它在 <code>resumeWith</code> 里再驱动状态机继续。这就是协程"挂起-恢复"循环的本质。</div>
+
+        <h3>状态机生命周期：一张图看全貌</h3>
+        <div class="diagram">
+          <svg viewBox="0 0 780 380" width="100%" role="img" aria-label="状态机挂起恢复全周期">
+            <defs><marker id="sm" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L9 5L1 9Z" fill="#7F77DD"/></marker><marker id="smr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L9 5L1 9Z" fill="#D85A30"/></marker></defs>
+            <rect x="240" y="20" width="300" height="52" rx="10" fill="#EEEDFE" stroke="#7F77DD" stroke-width="1.5"/>
+            <text x="390" y="42" text-anchor="middle" fill="#26215C" font-size="14" font-weight="700">label=0: 进入函数</text>
+            <text x="390" y="58" text-anchor="middle" fill="#534AB7" font-size="11">创建状态机 SimpleSuspendSM</text>
+            <rect x="240" y="100" width="300" height="52" rx="10" fill="#E6F1FB" stroke="#378ADD" stroke-width="1.5"/>
+            <text x="390" y="122" text-anchor="middle" fill="#042C53" font-size="14" font-weight="700">label=0: 调用 delay(1000, this)</text>
+            <text x="390" y="138" text-anchor="middle" fill="#185FA5" font-size="11">label 设为 1，传入自己当 Continuation</text>
+            <rect x="240" y="180" width="300" height="52" rx="10" fill="#FAECE7" stroke="#D85A30" stroke-width="1.5"/>
+            <text x="390" y="202" text-anchor="middle" fill="#4A1B0C" font-size="14" font-weight="700">返回 COROUTINE_SUSPENDED</text>
+            <text x="390" y="218" text-anchor="middle" fill="#993C1D" font-size="11">线程被释放 ✦ invokeSuspend 返回给调用方</text>
+            <rect x="240" y="260" width="300" height="52" rx="10" fill="#E1F5EE" stroke="#1D9E75" stroke-width="1.5"/>
+            <text x="390" y="282" text-anchor="middle" fill="#04342C" font-size="14" font-weight="700">resumeWith(Result.success(Unit))</text>
+            <text x="390" y="298" text-anchor="middle" fill="#0F6E56" font-size="11">1秒后 delay 回调状态机</text>
+            <rect x="240" y="340" width="300" height="52" rx="10" fill="#EAF3DE" stroke="#639922" stroke-width="1.5"/>
+            <text x="390" y="362" text-anchor="middle" fill="#173404" font-size="14" font-weight="700">label=1: return "done"</text>
+            <text x="390" y="378" text-anchor="middle" fill="#3B6D11" font-size="11">completion.resumeWith("done") → 调用方拿到结果</text>
+            <line x1="390" y1="72" x2="390" y2="98" stroke="#7F77DD" stroke-width="2" marker-end="url(#sm)"/>
+            <line x1="390" y1="152" x2="390" y2="178" stroke="#378ADD" stroke-width="2" marker-end="url(#sm)"/>
+            <line x1="390" y1="232" x2="390" y2="258" stroke="#D85A30" stroke-width="2" marker-end="url(#smr)"/>
+            <line x1="390" y1="312" x2="390" y2="338" stroke="#1D9E75" stroke-width="2" marker-end="url(#sm)"/>
+          </svg>
+        </div>
       </div>
     </section>
 
@@ -1371,6 +1414,40 @@ public interface Channel&lt;E&gt; : SendChannel&lt;E&gt;, ReceiveChannel&lt;E&gt
     val capacity: Int
 }</code></pre>
         <div class="note"><strong>性能提示：</strong>Channel 在协程间传递数据比 Flow 更直接（少了声明式操作符链的开销），但可以维护的状态更少。一般规则：<strong>单纯的协程到协程消息用 Channel，多消费者需要背压/操作符/变换的用 Flow。</strong></div>
+
+        <h3>高级模式：Ticker 定时通道</h3>
+<pre><code class="language-kotlin">// ticker: 每隔一段时间自动发送 Unit 的 Channel
+val ticker = ticker(delayMillis = 1000, initialDelayMillis = 0)
+var count = 0
+for (tick in ticker) {
+    if (++count &gt; 5) { ticker.cancel(); break }
+    println("Tick $count at ${System.currentTimeMillis()}")
+}
+// Tick 1 at 0ms (initialDelay=0)
+// Tick 2 at 1000ms, Tick 3 at 2000ms, ...
+// 精确的定时任务，比 delay() 循环更准时</code></pre>
+
+        <h3>高级模式：produce 构建器</h3>
+<pre><code class="language-kotlin">// produce: 创建一个协程 + Channel 的组合，协程负责生产数据
+fun CoroutineScope.produceUsers(): ReceiveChannel&lt;User&gt; = produce {
+    while (isActive) {
+        send(fetchNextUser())
+        delay(500)
+    }
+}
+// produce 协程取消时自动关闭 Channel，消费者循环自动退出</code></pre>
+
+        <h3>Channel 关闭的信号机制</h3>
+<pre><code class="language-kotlin">// Channel 关闭后，for 循环自动终止
+for (value in channel) { ... }  // close() 后循环结束
+
+// receive() 在关闭后抛 ClosedReceiveChannelException
+// receiveCatching() 返回 Success/Failure 不抛异常
+val result: ChannelResult&lt;T&gt; = channel.receiveCatching()
+result.onSuccess {  }   // 正常值
+      .onFailure {  }   // Channel 已关闭
+      .onClosed {  }    // 关闭原因</code></pre>
+        <div class="warn"><strong>Channel 泄漏：</strong>如果生产者忘记 close()，消费者的 for 循环永远不退出。produce 构建器的协程取消时自动 close，更适合生产消费场景。</div>
       </div>
     </section>
 
@@ -1877,6 +1954,79 @@ class Repo(
         <strong>75 分</strong><span>能结合 Android 场景给出正确写法，知道 <code>viewModelScope</code>、<code>repeatOnLifecycle</code>、<code>StateFlow</code> 的适用场景。</span>
         <strong>90 分</strong><span>能用状态机、Job 树、Dispatcher、Flow 管道解释现象，并能指出常见错误用法。</span>
         <strong>95+ 分</strong><span>能主动补充源码心智模型、测试策略、性能边界和业务取舍，不靠背诵也能处理变体追问。</span>
+      </div>
+    </section>
+
+    <!-- ===== 协程速查卡片 ===== -->
+    <section class="section" id="cheatsheet">
+      <h2>协程速查卡片：面试前一小时看这个就够了</h2>
+      <div class="chapter">
+        <div class="grid three">
+          <article class="card">
+            <h3>挂起与恢复</h3>
+            <p><code>suspend</code> → 编译器加 Continuation 参数，生成状态机</p>
+            <p>挂起点 → label 保存位置 → 返回 <code>COROUTINE_SUSPENDED</code></p>
+            <p>恢复 → <code>resumeWith(result)</code> → 状态机继续</p>
+            <p>挂起 ≠ 阻塞：线程被释放</p>
+          </article>
+          <article class="card">
+            <h3>Scope / Context</h3>
+            <p>Context = <strong>CombinedContext 链表</strong>（非 HashMap）</p>
+            <p><code>+</code> 合并，同 Key 后者覆盖</p>
+            <p>子 Context = 父 Context + 参数 Context</p>
+            <p>GlobalScope：无父 Job，孤儿协程</p>
+          </article>
+          <article class="card">
+            <h3>Dispatcher</h3>
+            <p>Default：CPU密集，线程数=核心数</p>
+            <p>IO：弹性池，上限64。1.6+ 与 Default 分离</p>
+            <p>Main：Android主线程</p>
+            <p>Unconfined：测试用，生产禁用</p>
+            <p>切入时机：<code>.intercepted()</code></p>
+          </article>
+          <article class="card">
+            <h3>结构化并发</h3>
+            <p><code>coroutineScope</code>：子异常→取消父→取消兄弟</p>
+            <p><code>supervisorScope</code>：子异常不传播</p>
+            <p>取消是协作式：需挂起点/ensureActive/yield</p>
+            <p>CancellationException：不崩溃，不被 CEH 捕获</p>
+          </article>
+          <article class="card">
+            <h3>异常处理</h3>
+            <p>CEH：只对 Scope 根协程生效</p>
+            <p>子协程 CEH 无效：异常沿 Job 树传播</p>
+            <p>async 异常：存 Deferred 中，await 时抛出</p>
+            <p>catch Throwable 前先判断 CancellationException</p>
+          </article>
+          <article class="card">
+            <h3>Flow</h3>
+            <p>冷流：collect 才执行，每个收集者独立</p>
+            <p>热流：StateFlow（状态）vs SharedFlow（事件）</p>
+            <p>flowOn：只影响上游，用 channel 实现</p>
+            <p>背压默认：emit 等 collect</p>
+            <p>catch：只捕获上游，collect 里需 try/catch</p>
+          </article>
+          <article class="card">
+            <h3>Channel</h3>
+            <p>RENDEZVOUS / BUFFERED / CONFLATED / UNLIMITED</p>
+            <p>fan-out：多个消费者竞争消费</p>
+            <p>bridge：receiveAsFlow() / produceIn()</p>
+          </article>
+          <article class="card">
+            <h3>Android 落地</h3>
+            <p>viewModelScope = SupervisorJob + Main</p>
+            <p>repeatOnLifecycle：生命周期感知收集</p>
+            <p>Dispatcher 注入：方便测试替换</p>
+            <p>Repository 自己切 IO，调用方不关心线程</p>
+          </article>
+          <article class="card">
+            <h3>测试</h3>
+            <p>runTest + StandardTestDispatcher</p>
+            <p>advanceUntilIdle() 等所有协程完成</p>
+            <p>ViewModel 测试断言状态流转</p>
+            <p>硬编码 Dispatchers.IO = 不可测试</p>
+          </article>
+        </div>
       </div>
     </section>
 
