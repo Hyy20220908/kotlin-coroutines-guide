@@ -419,6 +419,7 @@ td{color:var(--muted)}
         <span class="nav-kicker">Start</span>
         <a href="#roadmap">学习路线</a>
         <a href="#why-coroutines">为什么需要协程</a>
+        <a href="#analogies">⛶ 类比破壁 (通俗直译)</a>
         <a href="#knowledge-map">协程知识地图</a>
       </div>
       <div class="nav-section">
@@ -621,6 +622,61 @@ td{color:var(--muted)}
         </article>
       </div>
       <div class="note"><strong>面试表达模板：</strong>协程是编译器、标准库和调度器配合实现的轻量级并发模型。编译器把 suspend 函数改写为状态机，标准库用 Continuation 表示恢复点，用 Job 维护结构化并发，用 Dispatcher 决定恢复线程。</div>
+    </section>
+
+    <!-- ===== 类比破壁 ===== -->
+    <section class="section" id="analogies">
+      <h2>类比破壁：把协程黑话翻译成生活场景</h2>
+      <p class="lead">协程术语多，换个角度全变简单了。下面每个核心概念配一个生活类比，看完再回去读技术部分，会发现全通了。</p>
+
+      <div class="grid two">
+        <article class="card">
+          <h3>Continuation = 点外卖的取餐号</h3>
+          <p>你在 App 里下了单，拿到一个取餐号。你可以先去开会、写代码——不用在店门口站着等。饭好了，叫号器一响，你拿着号码回来取。Continuation 就是这个取餐号：<strong>它记住了你从哪暂停的（label），等你回来时接着往下执行（resumeWith）。</strong></p>
+          <p>类比：如果不用取餐号，你只能站在店门口一直等——这就是"阻塞线程"。取餐号让你释放线程去做别的事——这就是"挂起不阻塞"。</p>
+        </article>
+        <article class="card">
+          <h3>CoroutineScope = 会议室的租约</h3>
+          <p>你租了一间会议室（Scope），在里面开会（启动协程）。租约到期（Scope cancel），会议室里的所有人（子协程）必须散会——不管他们还有没有说完。这就是结构化并发：<strong>房间的租约就是所有在里面工作的任务的硬上限。</strong></p>
+          <p>GlobalScope 就是"不签租约随便用"——会议室永远不关门，别人想进来就进来，极容易出事。</p>
+        </article>
+        <article class="card">
+          <h3>CoroutineContext = 行李箱上的行李牌</h3>
+          <p>你的行李箱上贴满了各种标签：姓名（CoroutineName）、航班号（Job）、目的地（Dispatcher）、保险单（CEH）。每个标签独立贴在箱子上，统一管理。Context 就是<strong>所有标签的集合</strong>。+"就是把一张新标签贴上去，如果原来已经有同类的旧标签，新标签覆盖旧的。</p>
+        </article>
+        <article class="card">
+          <h3>Dispatcher = 快递公司的分拣中心</h3>
+          <p>你有一个包裹（协程），Dispatcher 就是快递公司的分拣中心。它不自己送快递，只是<strong>决定包裹被哪个站点（线程）处理</strong>。Default 就是"CPU 处理中心"（按核心数分配人手），IO 就是"仓储物流中心"（人手弹性扩展），Main 就是"线下门店"（只有一个人，不能干重活）。</p>
+        </article>
+        <article class="card">
+          <h3>Job 树 = 公司组织架构</h3>
+          <p>CEO（根 Job）下面有部门总监（子 Job），总监下有经理（孙 Job）。<strong>公司倒闭（CEO cancel），所有部门全部解散——取消向下传播。某个部门出了严重事故（子异常），CEO 有可能被连累下课——异常向上传播。</strong></p>
+          <p>SupervisorJob 就是"给了部门独立运营权"——某个部门出事，不影响其他部门，也不影响 CEO。</p>
+        </article>
+        <article class="card">
+          <h3>CancellationException = 公司发的下班通知</h3>
+          <p>公司 6 点下班是正常安排——不是开除你。CancellationException 就是这个下班通知：<strong>它不是错误，不会上报 HR（CEH），只是告诉你"今天到这，收拾东西走"（finally 块正常执行清理）。</strong></p>
+          <p>RuntimeException 才是"你被开除了"——HR 部（CEH）要记录，所有跟你合作的项目（兄弟协程）也要停下来。</p>
+        </article>
+        <article class="card">
+          <h3>Flow 冷流 = Netflix 点播；热流 = 收音机</h3>
+          <p><strong>冷流（点播）：</strong>你不点播放，电影不会自己开始放。每个人在自己设备上点播，看到的是自己从头开始的独立播放。这就是 <code>flow {}</code>：<strong>不 collect 不执行，每个收集者独立。</strong></p>
+          <p><strong>热流（收音机）：</strong>电台一直在播，不管你有没有在听。你打开收音机听到的是当前正在播的内容，而不是从早上 6 点开始的录音。这就是 StateFlow/SharedFlow：<strong>数据源独立于监听者。</strong></p>
+        </article>
+        <article class="card">
+          <h3>Channel = 工厂里的传送带</h3>
+          <p>上游工人往传送带上放零件（send），下游工人从传送带末端取零件（receive）。传送带满了上游就停手等（挂起），传送带空了下游就等。RENDEZVOUS 就是"没有传送带——上游必须亲手递，下游必须亲手接"。UNLIMITED 就是"传送带无限长，上游随便放"。</p>
+        </article>
+        <article class="card">
+          <h3>Mutex = 只有一个坑的卫生间</h3>
+          <p>卫生间门上有个"使用中"的牌子。你进去后翻牌子（lock），出来后翻回（unlock）。有人在里面你就在门口等——但你不是傻站着堵住走廊（阻塞），而是去旁边的沙发上坐着等（挂起），里面的人出来叫你一声你再站起来进去。</p>
+        </article>
+        <article class="card">
+          <h3>CEH = 前台的投诉记录本</h3>
+          <p>公司各部门出了问题（子异常），先沿着汇报线层层上报。如果一路都没人处理，最后会到前台的意见簿上（CEH）。但前台不会替部门解决问题——它只是做好记录。而且，如果是正常下班（CancellationException），前台不会记。</p>
+        </article>
+      </div>
+      <div class="tip"><strong>怎么用这个专区：</strong>遇到某个概念读不懂时，先回来看对应的类比。脑中有生活场景，再去看技术定义，会发现"哦原来就是这个意思"。</div>
     </section>
 
     <section class="section" id="suspend">
