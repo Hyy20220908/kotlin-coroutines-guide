@@ -427,6 +427,8 @@ td{color:var(--muted)}
         <a href="#suspend-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 状态机源码追踪</a>
         <a href="#context">Scope / Context / Dispatcher</a>
         <a href="#context-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 架构图与源码追踪</a>
+        <a href="#context-elements" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ Context Element 清单</a>
+        <a href="#builder-compare" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 构建器完全对比</a>
         <a href="#structured">结构化并发与取消</a>
         <a href="#structured-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ JobSupport 源码追踪</a>
         <a href="#exceptions">异常处理体系</a>
@@ -436,6 +438,7 @@ td{color:var(--muted)}
         <span class="nav-kicker">Flow</span>
         <a href="#flow">Flow 冷流与热流</a>
         <a href="#flow-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ SafeFlow 源码追踪</a>
+        <a href="#flow-operators" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 操作符速查 (9类)</a>
         <a href="#stateflow">StateFlow / SharedFlow</a>
         <a href="#channel">Channel 协程通信</a>
       </div>
@@ -921,6 +924,34 @@ class DispatchedContinuation&lt;T&gt;(
         <div class="path-step"><h3>⑥ resumeCancellableWith(Result.success(Unit))</h3><p>检查 isDispatchNeeded = true → dispatcher.dispatch(context, this) → 提交给弹性线程池</p></div>
         <div class="path-step"><h3>⑦ 线程池执行 run()</h3><p>→ 原始Continuation.resumeWith() → 状态机在 IO 线程执行 body</p></div>
       </div>
+
+        <h3>Dispatcher 调度时序图：协程一生中的线程切换</h3>
+        <div class="diagram">
+          <svg viewBox="0 0 780 340" width="100%" role="img" aria-label="Dispatcher 调度时序">
+            <defs><marker id="ds" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L9 5L1 9Z" fill="#378ADD"/></marker><marker id="dsr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L9 5L1 9Z" fill="#D85A30"/></marker></defs>
+            <line x1="60" y1="80" x2="720" y2="80" stroke="#888780" stroke-width="1.5"/>
+            <text x="720" y="74" text-anchor="end" fill="#888780" font-size="11">时间→</text>
+            <text x="50" y="130" text-anchor="end" fill="#7F77DD" font-size="12" font-weight="600">主线程</text>
+            <line x1="60" y1="125" x2="720" y2="125" stroke="#7F77DD" stroke-width="1" stroke-dasharray="6,3"/>
+            <rect x="100" y="115" width="90" height="20" rx="4" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5"/><text x="145" y="129" text-anchor="middle" fill="#26215C" font-size="10">launch(IO)</text>
+            <rect x="380" y="115" width="110" height="20" rx="4" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5"/><text x="435" y="129" text-anchor="middle" fill="#26215C" font-size="10">collect 继续</text>
+            <text x="50" y="175" text-anchor="end" fill="#D85A30" font-size="12" font-weight="600">IO 线程</text>
+            <line x1="60" y1="170" x2="720" y2="170" stroke="#D85A30" stroke-width="1" stroke-dasharray="6,3"/>
+            <rect x="200" y="160" width="100" height="20" rx="4" fill="#FAECE7" stroke="#D85A30" stroke-width="0.5"/><text x="250" y="174" text-anchor="middle" fill="#4A1B0C" font-size="10">body 执行</text>
+            <rect x="320" y="160" width="50" height="20" rx="4" fill="#FFF5F2" stroke="#D85A30" stroke-width="0.5"/><text x="345" y="174" text-anchor="middle" fill="#4A1B0C" font-size="10">挂起</text>
+            <text x="50" y="220" text-anchor="end" fill="#639922" font-size="12" font-weight="600">Default</text>
+            <line x1="60" y1="215" x2="720" y2="215" stroke="#639922" stroke-width="1" stroke-dasharray="6,3"/>
+            <rect x="500" y="205" width="120" height="20" rx="4" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/><text x="560" y="219" text-anchor="middle" fill="#173404" font-size="10">withContext(Default)</text>
+            <path d="M190 125 C200 150 210 165 200 162" fill="none" stroke="#D85A30" stroke-width="1.5" marker-end="url(#dsr)"/>
+            <path d="M370 170 C430 185 510 210 500 207" fill="none" stroke="#639922" stroke-width="1.5" marker-end="url(#dsr)" stroke-dasharray="4,3"/>
+            <path d="M590 215 C610 190 560 140 490 128" fill="none" stroke="#7F77DD" stroke-width="1.5" marker-end="url(#dsr)" stroke-dasharray="4,3"/>
+            <text x="215" y="150" fill="#D85A30" font-size="10">.intercepted()→dispatch</text>
+            <text x="430" y="198" fill="#639922" font-size="10">withContext</text>
+            <text x="540" y="145" fill="#7F77DD" font-size="10">回到collect</text>
+            <text x="390" y="290" text-anchor="middle" fill="#888780" font-size="12">每次切换都经过 DispatchedContinuation → dispatch() → 线程池 run()</text>
+          </svg>
+        </div>
+      </div>
     </section>
 
     <!-- ===== CoroutineContext Element 完整清单 ===== -->
@@ -940,6 +971,24 @@ class DispatchedContinuation&lt;T&gt;(
         </tbody>
       </table>
       <div class="tip"><strong>自定义 Element：</strong>你可以用 <code>class MyKey : AbstractCoroutineContextElement(MyKey) { companion object Key : Key&lt;MyKey&gt; }</code> 创建自己的 Context Element，存取方式和标准 Element 完全一致。</div>
+    </section>
+
+    <!-- ===== 协程构建器完整对比 ===== -->
+    <section class="section" id="builder-compare">
+      <h2>所有协程构建器 / Scope 函数一表对比</h2>
+      <p class="lead">面试里最容易搞混的就是"这个构建器到底会不会等子协程""异常怎么走""返回什么"。一张表全理清。</p>
+      <table>
+        <thead><tr><th>构建器</th><th>阻塞调用线程?</th><th>等待子协程?</th><th>返回值</th><th>异常行为</th><th>适用场景</th></tr></thead>
+        <tbody>
+          <tr><td><code>launch {}</code></td><td>否</td><td>否</td><td>Job</td><td>默认传播到父/CEH</td><td>不关心返回值、"发射后不管"</td></tr>
+          <tr><td><code>async {}</code></td><td>否</td><td>否</td><td>Deferred&lt;T&gt;</td><td>存 Deferred，await 时抛出</td><td>需要并发拿结果</td></tr>
+          <tr><td><code>runBlocking {}</code></td><td><strong>是</strong></td><td><strong>是</strong></td><td>T</td><td>同步抛出</td><td>main/测试/桥接</td></tr>
+          <tr><td><code>coroutineScope {}</code></td><td>否(挂起)</td><td><strong>是</strong></td><td>T</td><td>子异常传播到父→try/catch可捕获</td><td>并发任务必须全部成功</td></tr>
+          <tr><td><code>supervisorScope {}</code></td><td>否(挂起)</td><td><strong>是</strong></td><td>T</td><td>子异常不传播,子自己处理</td><td>并发任务允许部分失败</td></tr>
+          <tr><td><code>withContext(ctx) {}</code></td><td>否(挂起)</td><td><strong>是</strong></td><td>T</td><td>同步抛出</td><td>切换线程执行一段代码</td></tr>
+          <tr><td><code>produce {}</code></td><td>否</td><td>否</td><td>ReceiveChannel</td><td>协程取消时自动close Channel</td><td>构建生产者 Channel</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section class="section" id="structured">
@@ -1295,6 +1344,74 @@ override var value: T
         }
         // StateFlow 自带去重: 新值和旧值 equals 相同时不通知
     }</code></pre>
+      </div>
+    </section>
+
+    <!-- ===== Flow 操作符速查 ===== -->
+    <section class="section" id="flow-operators">
+      <h2>Flow 操作符速查：需要什么功能，找哪个操作符</h2>
+      <div class="chapter">
+        <div class="grid three">
+          <article class="card">
+            <h3>变换</h3>
+            <p><code>map {}</code> — 一对一转换</p>
+            <p><code>filter {}</code> — 按条件过滤</p>
+            <p><code>transform {}</code> — 自由发射（可发射多个）</p>
+            <p><code>mapNotNull {}</code> — 过滤 null</p>
+            <p><code>withIndex()</code> — 附带索引</p>
+          </article>
+          <article class="card">
+            <h3>展开嵌套</h3>
+            <p><code>flatMapConcat {}</code> — 顺序展开</p>
+            <p><code>flatMapMerge {}</code> — 并发展开</p>
+            <p><code>flatMapLatest {}</code> — 新值取消旧的展开</p>
+            <p><code>flattenConcat/Merge()</code> — 无变换版展开</p>
+          </article>
+          <article class="card">
+            <h3>线程/上下文</h3>
+            <p><code>flowOn(ctx)</code> — 切换上游执行上下文</p>
+            <p><code>launchIn(scope)</code> — 在 Scope 内收集</p>
+          </article>
+          <article class="card">
+            <h3>背压</h3>
+            <p><code>buffer(n)</code> — 缓冲区 n 个元素</p>
+            <p><code>conflate()</code> — 只保留最新值</p>
+            <p><code>collectLatest {}</code> — 新值取消上次消费</p>
+          </article>
+          <article class="card">
+            <h3>截断</h3>
+            <p><code>take(n)</code> — 取前 n 个</p>
+            <p><code>drop(n)</code> — 跳过前 n 个</p>
+            <p><code>first()</code> — 取第一个</p>
+            <p><code>takeWhile {}</code> — 按条件持续取</p>
+          </article>
+          <article class="card">
+            <h3>生命周期</h3>
+            <p><code>onStart {}</code> — 收集开始时</p>
+            <p><code>onCompletion {}</code> — 完成/取消时</p>
+            <p><code>onEach {}</code> — 每个元素到达时</p>
+            <p><code>onEmpty {}</code> — 没有任何元素时</p>
+            <p><code>catch {}</code> — 捕获上游异常</p>
+          </article>
+          <article class="card">
+            <h3>组合</h3>
+            <p><code>zip(other) {}</code> — 一一配对</p>
+            <p><code>combine(other) {}</code> — 取各自最新值组合</p>
+            <p><code>merge(other)</code> — 交替合并两个流</p>
+          </article>
+          <article class="card">
+            <h3>冷→热</h3>
+            <p><code>stateIn(scope)</code> → StateFlow</p>
+            <p><code>shareIn(scope)</code> → SharedFlow</p>
+            <p><code>produceIn(scope)</code> → ReceiveChannel</p>
+          </article>
+          <article class="card">
+            <h3>错误与重试</h3>
+            <p><code>retry(n) {}</code> — 出错后重试 n 次</p>
+            <p><code>retryWhen {}</code> — 按条件重试</p>
+            <p><code>catch { emit() }</code> — 捕获后发射兜底值</p>
+          </article>
+        </div>
       </div>
     </section>
 
