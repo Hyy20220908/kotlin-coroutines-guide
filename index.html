@@ -443,6 +443,8 @@ td{color:var(--muted)}
         <span class="nav-kicker">Advanced</span>
         <a href="#select">Select 表达式</a>
         <a href="#coroutine-start">CoroutineStart 模式</a>
+        <a href="#advanced-api">进阶 API (withTimeout/Mutex/callbackFlow)</a>
+        <a href="#rxjava-migration">RxJava → 协程迁移</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">Android</span>
@@ -1815,6 +1817,128 @@ launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
 }</code></pre>
         <div class="warn"><strong>UNDISPATCHED 陷阱：</strong>它在当前线程立即执行到第一个挂起点，这意味着如果你的调用线程是 Main 线程且 block 里有耗时操作，会卡 UI。慎用。</div>
       </div>
+    </section>
+
+    <!-- ===== 进阶 API 专题 ===== -->
+    <section class="section" id="advanced-api">
+      <h2>进阶 API：面试加分项和日常效率工具</h2>
+      <p class="lead">这节覆盖了 launch/async 之外那些"知道的人不多但非常好用"的协程 API。每一个都是面试里能区分 70 分和 90 分的知识点。</p>
+
+      <div class="chapter">
+        <h3>runBlocking：阻塞世界的桥梁</h3>
+        <p><code>runBlocking</code> 的名字就是一个警告：<strong>它真的会阻塞当前线程</strong>，直到内部协程执行完毕。它存在的唯一理由是在主函数、测试或初始化阶段——这些地方没有现成的 Scope。</p>
+<pre><code class="language-kotlin">// main() 里运行协程的唯一方式，直到 Kotlin 原生支持 suspend main
+fun main() = runBlocking {
+    launch { delay(1000); println("Hello") }
+}
+
+// 测试里不需要，用 runTest 更好
+// 初始化时如果实在拿不到 Scope，也尽量用 runBlocking 的最小作用域
+runBlocking {
+    val data = async { loadInitialData() }
+    initialize(data.await())
+}</code></pre>
+        <div class="warn"><strong>面试踩分点：</strong>说出 runBlocking 会阻塞调用线程、在 suspend 函数内部绝不应该使用、它是"把异步世界桥接到同步世界的最后手段"。</div>
+
+        <h3>withTimeout：给协程加一个死线</h3>
+<pre><code class="language-kotlin">// withTimeout — 超时抛 TimeoutCancellationException
+try {
+    val result = withTimeout(3000) { api.fetchData() }
+} catch (e: TimeoutCancellationException) {
+    showError("请求超时")
+}
+
+// withTimeoutOrNull — 超时返回 null（更常用）
+val result = withTimeoutOrNull(3000) { api.fetchData() } ?: cachedData</code></pre>
+        <p><strong>内部原理：</strong><code>withTimeout</code> 启动一个计时协程，超时后调用 <code>job.cancel(TimeoutCancellationException)</code>。因为是 CancellationException，不会触发 CEH——但你的 finally 块会正常执行清理。</p>
+
+        <h3>yield：主动让出执行权</h3>
+<pre><code class="language-kotlin">// 在 CPU 密集循环中给其他协程执行机会
+withContext(Dispatchers.Default) {
+    repeat(10000) {
+        heavyComputation(it)
+        if (it % 100 == 0) yield()     // 每 100 次让出一次
+    }
+}
+// yield = suspend + 立即恢复，效果是把自己排到线程队列末尾</code></pre>
+        <p><code>yield</code> 不产生任何数据变化，它只是"我先排队，让你先跑"。和 <code>delay(0)</code> 的区别：delay 调用的是调度器的时间队列，yield 是线程池的任务队列，在单线程 Dispatcher 上效果相同。</p>
+
+        <h3>Mutex：协程安全的互斥锁</h3>
+        <p>多协程同时修改共享资源时，不能用 Java 的 <code>synchronized</code> 或 <code>ReentrantLock</code>——它们会阻塞线程，破坏协程的挂起语义。</p>
+<pre><code class="language-kotlin">val mutex = Mutex()
+var counter = 0
+
+repeat(1000) {
+    launch(Dispatchers.Default) {
+        mutex.withLock {
+            counter++    // 同一时刻只有一个协程能进入这里
+        }
+    }
+}
+// withLock 是挂起函数，等待时不占用线程</code></pre>
+        <div class="tip"><strong>和 synchronized 的区别：</strong>synchronized 阻塞线程，mutex.withLock 挂起协程。所以在 Main 线程用 mutex 不会卡 UI（等待时线程可以干别的），而 synchronized 会 ANR。</div>
+
+        <h3>callbackFlow：把回调 API 变成 Flow</h3>
+        <p>这是把传统回调库（LocationManager、BroadcastReceiver、SensorManager）接入协程世界的最强工具：</p>
+<pre><code class="language-kotlin">// 传统回调 → Flow 的标准模板
+fun LocationManager.locationFlow(): Flow&lt;Location&gt; = callbackFlow {
+    val listener = LocationListener { location -&gt;
+        trySend(location)         // 把回调数据发送到 Channel
+    }
+    requestLocationUpdates(provider, 0, 0f, listener)
+    
+    awaitClose {                  // Flow 收集取消时自动执行清理
+        removeUpdates(listener)
+    }
+}
+// 收集者取消时，awaitClose 自动触发，防止内存泄漏</code></pre>
+
+        <h3>shareIn / stateIn：冷流转热流</h3>
+        <p>你写了一个 <code>flow { }</code> 构建的冷流，现在多个 UI 组件都想订阅同一个数据源。每个组件 collect 会导致重复网络请求——你需要把它变成热流：</p>
+<pre><code class="language-kotlin">// stateIn: 冷流 → StateFlow
+val userState: StateFlow&lt;User?&gt; = repository.userFlow()
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+// shareIn: 冷流 → SharedFlow
+val events: SharedFlow&lt;Event&gt; = eventFlow
+    .shareIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(),
+        replay = 0
+    )
+
+// SharingStarted 三种策略:
+// Eagerly:    立即启动，永不停止
+// Lazily:     第一个订阅者出现时启动，永不停止
+// WhileSubscribed: 有订阅者时活跃，最后订阅者消失后等 N ms 关闭</code></pre>
+        <div class="note"><strong>标准选择：</strong>需要持有当前状态 → stateIn + WhileSubscribed(5000)；需要共享一次性事件 → shareIn + WhileSubscribed() + replay=0。</div>
+      </div>
+    </section>
+
+    <!-- ===== RxJava 迁移指南 ===== -->
+    <section class="section" id="rxjava-migration">
+      <h2>RxJava → 协程迁移指南：一个操作符一张映射表</h2>
+      <p class="lead">还在用 RxJava 的 Android 项目，并不需要一次性重写。关键是知道每个 Rx 概念对应的协程/Flow 等价物。</p>
+      <table>
+        <thead><tr><th>RxJava</th><th>Kotlin 协程 / Flow</th><th>关键差异</th></tr></thead>
+        <tbody>
+          <tr><td><code>Single&lt;T&gt;</code></td><td><code>suspend fun</code></td><td>suspend 是语言特性，不创建对象</td></tr>
+          <tr><td><code>Observable&lt;T&gt;</code></td><td><code>Flow&lt;T&gt;</code></td><td>Flow 默认冷流，Observable 默认热流</td></tr>
+          <tr><td><code>Flowable&lt;T&gt;</code></td><td><code>Flow&lt;T&gt;</code> + <code>buffer(n)</code></td><td>背压控制方式不同</td></tr>
+          <tr><td><code>Completable</code></td><td><code>Job</code> 或 <code>suspend fun</code> 返回 Unit</td><td>不带结果的任务</td></tr>
+          <tr><td><code>dispose</code></td><td>Scope.cancel() / Job.cancel()</td><td>协程取消是结构化自动级联</td></tr>
+          <tr><td><code>subscribeOn</code></td><td><code>withContext(dispatcher)</code></td><td>协程保持线程上下文更严格</td></tr>
+          <tr><td><code>observeOn</code></td><td><code>flowOn(dispatcher)</code></td><td>flowOn 只影响上游</td></tr>
+          <tr><td><code>map / filter / flatMap</code></td><td><code>.map {} / .filter {} / .flatMap* {}</code></td><td>API 基本一致</td></tr>
+          <tr><td><code>BehaviorSubject</code></td><td><code>MutableStateFlow</code></td><td>StateFlow 不需要手动管理订阅</td></tr>
+          <tr><td><code>PublishSubject</code></td><td><code>MutableSharedFlow</code></td><td>SharedFlow 可配置 replay</td></tr>
+        </tbody>
+      </table>
+      <div class="tip"><strong>渐进迁移策略：</strong>不要在项目里同时维护 RxJava 和协程的双轨。先统一 Repository 层换成 suspend/Flow，ViewModel + UI 继续用 Rx（通过 asFlow() 桥接）。等 Repository 全部迁移完，再把 ViewModel 切换到协程。</div>
     </section>
 
     <section class="section" id="exercise-lab">
