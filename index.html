@@ -576,6 +576,7 @@ table tr:hover{background:rgba(101,215,196,.04)}
       <div class="nav-section">
         <span class="nav-kicker">入门准备</span>
         <a href="#roadmap">学习路线</a>
+        <a href="#how-to-read">如何读这本书</a>
         <a href="#why-coroutines">为什么需要协程</a>
         <a href="#knowledge-map">协程知识地图</a>
         <a href="#analogies">类比破壁</a>
@@ -690,6 +691,50 @@ table tr:hover{background:rgba(101,215,196,.04)}
       </div>
     </section>
 
+    <!-- ===== 如何读这本书 ===== -->
+    <section class="section" id="how-to-read">
+      <h2>如何读这本书：三条路径，不同收获</h2>
+      <p class="lead">这不是一本需要从头读到尾的字典——这是一条有人带你走的路。根据你的目标选一条路径，每一章末尾都有"自检问题"帮你判断能不能继续前进。</p>
+      <div class="chapter">
+        <h3>选一条适合你的路</h3>
+        <div class="grid three">
+          <article class="card">
+            <h3>🚀 快速上手（1-2天）</h3>
+            <p>目标：能从主线程把任务挪到后台，页面销毁时不泄漏。</p>
+            <p><strong>路线：</strong>类比破壁 → suspend → Scope/Context → 结构化并发 → Android落地架构</p>
+            <p style="color:var(--accent);font-size:13px">跳过所有"源码追踪"和"源码深潜"章节，先建立直觉模型。</p>
+          </article>
+          <article class="card">
+            <h3>📖 系统学习（1-2周）</h3>
+            <p>目标：看懂源码，能解释"为什么"，面试时能回答追问。</p>
+            <p><strong>路线：</strong>按目录顺序通读，每个主章节读完它的源码追踪子章节后再往下走。</p>
+            <p style="color:var(--accent);font-size:13px">遇到标注 <span style="color:var(--subtle)">📌 第一遍可跳过</span> 的内容可以先略过。</p>
+          </article>
+          <article class="card">
+            <h3>🎯 面试突击（半天）</h3>
+            <p>目标：明天面试，今天把核心概念串起来，能答出"现象+原理+源码"。</p>
+            <p><strong>路线：</strong>源码阅读路线图 → 面试题库 → 追问训练 → 速查卡片</p>
+            <p style="color:var(--accent);font-size:13px">每道面试题底部标注了关联章节，答不上来就点回去补。</p>
+          </article>
+        </div>
+
+        <h3>章节内的三个标记</h3>
+        <table>
+          <thead><tr><th>标记</th><th>含义</th><th>建议</th></tr></thead>
+          <tbody>
+            <tr><td><span style="color:var(--accent-2);font-weight:700">💬 作者注</span></td><td>我的踩坑经验、观点和判断</td><td>必读——这是书和文档的区别所在</td></tr>
+            <tr><td><span style="color:var(--subtle)">📌 第一遍可跳过</span></td><td>深层源码分析，不影响理解主线</td><td>系统学习第二遍时再深读</td></tr>
+            <tr><td><span style="color:var(--ok)">✅ 读后自检</span></td><td>3 个你能回答就继续的问题</td><td>答不上来就回头重读本节</td></tr>
+          </tbody>
+        </table>
+
+        <h3>这本书和文档的区别</h3>
+        <p>市面上的协程资料分两种：一种教你 API（"launch 是启动协程的"），一种给你源码（"JobSupport 用了 AtomicReference"）。这本书做的是<strong>把两者连起来</strong>——先给你一个生活类比建立直觉，再带你从 API 往源码走三层，最后回到面试考场告诉你"这个问题你要这样说"。</p>
+        <p>每章的结构：<strong>你会遇到的问题 → 直觉模型（类比）→ 技术原理 → 源码验证 → 面试怎么答 → 读后自检</strong>。如果某个章节没有走完这个链条，说明那块内容还在建设中。</p>
+        <div class="tip"><strong>最重要的建议：</strong>读第一遍时不要纠结于记住所有细节。你的目标是建立"哦原来是这样"的认知框架。第二遍再回来时，你会发现之前觉得模糊的地方突然都通了。这不是因为你更聪明了——是因为第一遍在你脑子里铺好了连接。</div>
+      </div>
+    </section>
+
     <section class="section" id="why-coroutines">
       <h2>为什么需要协程</h2>
       <div class="chapter">
@@ -765,6 +810,7 @@ table tr:hover{background:rgba(101,215,196,.04)}
             <tr><td><strong>学习曲线</strong></td><td>低：概念简单，坑多</td><td>陡峭：100+操作符</td><td>中：挂起+结构化并发+Flow，概念数可控</td></tr>
           </tbody>
         </table>
+        <div class="tip"><strong>✅ 读后自检：</strong>① 协程"异步代码像同步写"这句话容易误导什么？② 阻塞和挂起的本质区别是什么？③ 协程、线程、RxJava 各自解决什么问题？如果以上 3 个都能用自己的话讲清楚，说明这一节已经吃透了。</div>
         <div class="info"><strong>结论：</strong>线程是基础设施（你仍然需要线程池），协程是并发编排（怎么组织异步任务），RxJava 擅长复杂事件流处理。现代 Android 推荐的组合是：<strong>协程做基础异步 + Flow 做响应式流 + 线程池做底层并发承载</strong>。</div>
       </div>
     </section>
@@ -926,6 +972,7 @@ table tr:hover{background:rgba(101,215,196,.04)}
         <p>同时，局部变量也不能简单放在普通栈帧里。因为挂起时当前函数已经返回了，原来的调用栈不再持续占用线程栈。像上面的 <code>user</code>，在第二个挂起点之后还要用，所以它会被提升到状态机对象的字段里。恢复时，状态机从字段中取回这些局部变量，继续执行后面的代码。</p>
         <h3>为什么返回值会变成 Any?</h3>
         <p>挂起函数编译后要表达两种完全不同的结果：如果没有挂起，它可以直接返回真实结果；如果挂起了，它要告诉调用方“我先返回，后续通过 Continuation 恢复”。所以编译后的函数通常会有一个宽泛的返回类型：正常完成时返回业务值，挂起时返回 <code>COROUTINE_SUSPENDED</code>。</p>
+        <div class="note"><strong>💬 作者注：</strong>我第一次学协程时卡在这句话上："suspend 不启动线程"。后来才明白——suspend 只是告诉编译器"这个函数可能需要暂停"，真正切换线程的是 Dispatcher。把这两件事分开理解，协程就通了。</div>
         <div class="note"><strong>关键点：</strong><code>COROUTINE_SUSPENDED</code> 不是异常，也不是失败。它只是协程运行时内部使用的一个信号：当前函数没有同步完成，请不要继续当成普通返回值处理。</div>
       </div>
       <div class="split">
@@ -1944,6 +1991,7 @@ val state = _state.asStateFlow()</code></pre>
     .flowOn(Dispatchers.Default)
     .onEach { render(it) }       // Main，取决于 collect 所在协程
     .launchIn(viewModelScope)</code></pre>
+      <div class="tip"><strong>✅ 读后自检：</strong>① 为什么 flow {} 是冷流——用你自己的代码验证这个论断。② flowOn 影响上游还是下游？画一条链标注。③ catch 能捕获哪一段的异常？不能捕获哪一段？</div>
       <div class="warn"><strong>不要在 <code>flow {}</code> 里随意 <code>withContext</code> 发射数据。</strong>Flow 有上下文保持规则，上游线程切换应该通过 <code>flowOn</code> 表达，这样异常、取消和背压语义更清晰。</div>
     </section>
 
@@ -2426,6 +2474,7 @@ viewLifecycleOwner.lifecycleScope.launch {
         }
     }
 }</code></pre>
+      <div class="tip"><strong>✅ 读后自检：</strong>① Repository 能否持有 viewModelScope？为什么？② StateFlow 和 SharedFlow 分别适合你项目里的什么场景？③ 如果一个页面同时有 3 个独立模块的加载，应该用 coroutineScope 还是 supervisorScope？</div>
       <div class="note"><strong>为什么要 repeatOnLifecycle：</strong>它会在生命周期进入目标状态时启动收集，离开时取消收集。这样 UI 不可见时，上游能按取消语义停下来，减少泄漏和无意义刷新。</div>
       <h3>一套可复用的加载模式</h3>
 <pre><code class="language-kotlin">fun refresh() = viewModelScope.launch {
@@ -2943,6 +2992,7 @@ fun SearchBar(viewModel: SearchViewModel) {
 }</code></pre>
         <p>这个模式避免了在 <code>onValueChange</code> 里直接 launch 协程，保持声明式风格。但要注意 <code>snapshotFlow</code> 只感知 Compose State 的读写，不感知普通变量的变化。</p>
 
+        <div class="tip"><strong>✅ 读后自检：</strong>① collectAsState 和 collectAsStateWithLifecycle 的区别是什么？什么时候用前者就够了？② LaunchedEffect 和 rememberCoroutineScope 各自适合什么场景？③ snapshotFlow 感知的是什么变化？不感知什么变化？</div>
         <h3>Compose 协程反模式速查</h3>
         <table>
           <thead><tr><th>错误写法</th><th>问题</th><th>正确写法</th></tr></thead>
@@ -3379,22 +3429,22 @@ class MyActivity : AppCompatActivity() {
     <section class="section" id="interview">
       <h2>大厂面试题库：回答要有“现象 + 原理 + 实战边界”</h2>
       <p class="lead">下面这些题覆盖 Android 协程面试的大部分核心盘问。点击展开答案，建议自己先口述一遍，再对照补齐关键词。</p>
-      <div class="qa open"><button type="button">1. suspend 函数编译后发生了什么？</button><div class="answer">编译器会把 suspend 函数改写成带 Continuation 参数的状态机。每个挂起点对应一个 label，挂起前保存局部变量和恢复位置，返回 COROUTINE_SUSPENDED；异步操作完成后通过 resumeWith 重新进入状态机。</div></div>
-      <div class="qa"><button type="button">2. 挂起和阻塞有什么区别？</button><div class="answer">阻塞会占住当前线程等待结果；挂起会保存协程状态并返回，当前线程可以执行其他任务。恢复时由 Continuation 和 Dispatcher 决定在哪里继续执行。</div></div>
-      <div class="qa"><button type="button">3. launch 和 async 的区别？</button><div class="answer">launch 返回 Job，表达“只关心完成和取消”；async 返回 Deferred，表达“未来会有结果”。launch 根协程未捕获异常会走 CEH；async 的异常会保存在 Deferred 中，await 时抛出。但在普通父子结构中，async 失败仍会默认取消父 Job。</div></div>
-      <div class="qa"><button type="button">4. CoroutineExceptionHandler 为什么有时不生效？</button><div class="answer">CEH 只处理根协程未捕获异常。它不会处理子协程局部异常、不会替代 try/catch、不会处理 async 已保存到 Deferred 的异常，也不会处理 CancellationException。</div></div>
-      <div class="qa"><button type="button">5. SupervisorJob 和 Job 有什么区别？</button><div class="answer">普通 Job 中子协程失败会取消父协程，父再取消兄弟协程。SupervisorJob 隔离子失败，子异常不自动取消父和兄弟，适合页面多个模块互不影响的加载场景。</div></div>
-      <div class="qa"><button type="button">6. withContext 和 launch 有什么区别？</button><div class="answer">withContext 是挂起函数，会切换上下文并等待代码块完成，返回结果；launch 会启动一个新协程，立即返回 Job。需要顺序拿结果用 withContext，需要并发任务用 launch/async。</div></div>
-      <div class="qa"><button type="button">7. Flow 为什么是冷流？</button><div class="answer">flow{} 的 block 只有 collect 时才执行；每次 collect 都重新执行一遍，收集者之间默认互不共享。所以它适合描述数据生产逻辑，而不是保存 UI 状态。</div></div>
-      <div class="qa"><button type="button">8. flowOn 影响哪一段？</button><div class="answer">flowOn 只影响它上游的 Flow 及操作符，不影响下游 collect。它通常通过上下游协程和 channel 边界实现上下文切换，同时保持 Flow 的上下文规则。</div></div>
-      <div class="qa"><button type="button">9. Flow 的 catch 捕获不到什么？</button><div class="answer">catch 捕获的是上游异常，包括 emit 和上游操作符抛出的异常。collect 块里的异常属于下游，不会被前面的 catch 捕获，需要在 collect 外层 try/catch。</div></div>
-      <div class="qa"><button type="button">10. StateFlow 和 SharedFlow 怎么选？</button><div class="answer">页面状态用 StateFlow，因为它有初始值、保留最新值、可同步读取 value、按 equals 去重。一次性事件用 SharedFlow，因为它可以不重放，避免旋转屏幕或重新订阅时重复消费。</div></div>
-      <div class="qa"><button type="button">11. viewModelScope 为什么适合页面任务？</button><div class="answer">它绑定 ViewModel 生命周期，ViewModel 清理时自动取消子协程；底层通常是 SupervisorJob + Main Dispatcher。这样页面任务不会泄漏到 ViewModel 之外。</div></div>
-      <div class="qa"><button type="button">12. repeatOnLifecycle 解决什么问题？</button><div class="answer">它让 Flow 收集随着生命周期自动启动和取消。页面不可见时取消收集，重新可见时再次收集，避免 UI 不可见时仍刷新或泄漏。</div></div>
-      <div class="qa"><button type="button">13. 为什么不推荐 GlobalScope？</button><div class="answer">GlobalScope 不绑定业务生命周期，任务失败和取消都难以管理，容易造成泄漏和后台任务失控。除非是进程级、明确生命周期的全局任务，否则应使用业务 Scope。</div></div>
-      <div class="qa"><button type="button">14. 如何并发请求两个接口并合并结果？</button><div class="answer">在 coroutineScope 中用 async 启动两个子任务，再 await 合并。这样外层会等待所有子任务；任何一个失败会取消另一个并把异常抛给调用方。如果希望部分失败可用，用 supervisorScope + runCatching。</div></div>
-      <div class="qa"><button type="button">15. 取消为什么要重新抛 CancellationException？</button><div class="answer">CancellationException 是协程取消的正常信号。如果 catch Throwable 后吞掉它，父协程以为任务正常完成，取消传播被破坏，可能导致资源继续运行或状态错误。</div></div>
-      <div class="qa"><button type="button">16. 如何测试 delay 和 Dispatcher？</button><div class="answer">使用 kotlinx-coroutines-test 的 runTest、TestDispatcher 和 TestScheduler。生产代码通过构造函数注入 Dispatcher，测试中替换为 StandardTestDispatcher，再用 advanceUntilIdle 或 advanceTimeBy 推进虚拟时间。</div></div>
+      <div class="qa open"><button type="button">1. suspend 函数编译后发生了什么？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#suspend-deep">状态机源码追踪</a></p>编译器会把 suspend 函数改写成带 Continuation 参数的状态机。每个挂起点对应一个 label，挂起前保存局部变量和恢复位置，返回 COROUTINE_SUSPENDED；异步操作完成后通过 resumeWith 重新进入状态机。</div></div>
+      <div class="qa"><button type="button">2. 挂起和阻塞有什么区别？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#why-coroutines">为什么需要协程</a> · <a href="#suspend">suspend 与状态机</a></p>阻塞会占住当前线程等待结果；挂起会保存协程状态并返回，当前线程可以执行其他任务。恢复时由 Continuation 和 Dispatcher 决定在哪里继续执行。</div></div>
+      <div class="qa"><button type="button">3. launch 和 async 的区别？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#structured">结构化并发</a> · <a href="#exceptions">异常处理体系</a></p>launch 返回 Job，表达“只关心完成和取消”；async 返回 Deferred，表达“未来会有结果”。launch 根协程未捕获异常会走 CEH；async 的异常会保存在 Deferred 中，await 时抛出。但在普通父子结构中，async 失败仍会默认取消父 Job。</div></div>
+      <div class="qa"><button type="button">4. CoroutineExceptionHandler 为什么有时不生效？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#exceptions-deep">CEH 源码追踪</a></p>CEH 只处理根协程未捕获异常。它不会处理子协程局部异常、不会替代 try/catch、不会处理 async 已保存到 Deferred 的异常，也不会处理 CancellationException。</div></div>
+      <div class="qa"><button type="button">5. SupervisorJob 和 Job 有什么区别？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#structured-deep">JobSupport 源码追踪</a></p>普通 Job 中子协程失败会取消父协程，父再取消兄弟协程。SupervisorJob 隔离子失败，子异常不自动取消父和兄弟，适合页面多个模块互不影响的加载场景。</div></div>
+      <div class="qa"><button type="button">6. withContext 和 launch 有什么区别？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#context">Scope/Context/Dispatcher</a></p>withContext 是挂起函数，会切换上下文并等待代码块完成，返回结果；launch 会启动一个新协程，立即返回 Job。需要顺序拿结果用 withContext，需要并发任务用 launch/async。</div></div>
+      <div class="qa"><button type="button">7. Flow 为什么是冷流？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#flow">Flow 冷流与热流</a> · <a href="#flow-deep">SafeFlow 源码</a></p>flow{} 的 block 只有 collect 时才执行；每次 collect 都重新执行一遍，收集者之间默认互不共享。所以它适合描述数据生产逻辑，而不是保存 UI 状态。</div></div>
+      <div class="qa"><button type="button">8. flowOn 影响哪一段？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#flow">Flow 冷流与热流</a></p>flowOn 只影响它上游的 Flow 及操作符，不影响下游 collect。它通常通过上下游协程和 channel 边界实现上下文切换，同时保持 Flow 的上下文规则。</div></div>
+      <div class="qa"><button type="button">9. Flow 的 catch 捕获不到什么？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#flow">Flow 冷流与热流</a> · <a href="#exceptions">异常处理体系</a></p>catch 捕获的是上游异常，包括 emit 和上游操作符抛出的异常。collect 块里的异常属于下游，不会被前面的 catch 捕获，需要在 collect 外层 try/catch。</div></div>
+      <div class="qa"><button type="button">10. StateFlow 和 SharedFlow 怎么选？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#stateflow">StateFlow/SharedFlow</a></p>页面状态用 StateFlow，因为它有初始值、保留最新值、可同步读取 value、按 equals 去重。一次性事件用 SharedFlow，因为它可以不重放，避免旋转屏幕或重新订阅时重复消费。</div></div>
+      <div class="qa"><button type="button">11. viewModelScope 为什么适合页面任务？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#android">Android 落地架构</a></p>它绑定 ViewModel 生命周期，ViewModel 清理时自动取消子协程；底层通常是 SupervisorJob + Main Dispatcher。这样页面任务不会泄漏到 ViewModel 之外。</div></div>
+      <div class="qa"><button type="button">12. repeatOnLifecycle 解决什么问题？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#android">Android 落地架构</a></p>它让 Flow 收集随着生命周期自动启动和取消。页面不可见时取消收集，重新可见时再次收集，避免 UI 不可见时仍刷新或泄漏。</div></div>
+      <div class="qa"><button type="button">13. 为什么不推荐 GlobalScope？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#structured">结构化并发</a> · <a href="#anti-patterns">反模式与性能优化</a></p>GlobalScope 不绑定业务生命周期，任务失败和取消都难以管理，容易造成泄漏和后台任务失控。除非是进程级、明确生命周期的全局任务，否则应使用业务 Scope。</div></div>
+      <div class="qa"><button type="button">14. 如何并发请求两个接口并合并结果？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#structured">结构化并发</a> · <a href="#case-lab">场景实验室</a></p>在 coroutineScope 中用 async 启动两个子任务，再 await 合并。这样外层会等待所有子任务；任何一个失败会取消另一个并把异常抛给调用方。如果希望部分失败可用，用 supervisorScope + runCatching。</div></div>
+      <div class="qa"><button type="button">15. 取消为什么要重新抛 CancellationException？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#structured">结构化并发</a> · <a href="#exceptions">异常处理体系</a></p>CancellationException 是协程取消的正常信号。如果 catch Throwable 后吞掉它，父协程以为任务正常完成，取消传播被破坏，可能导致资源继续运行或状态错误。</div></div>
+      <div class="qa"><button type="button">16. 如何测试 delay 和 Dispatcher？</button><div class="answer"><p style="color:var(--subtle);font-size:12px;margin-bottom:8px">→ <a href="#testing">测试与调试</a></p>使用 kotlinx-coroutines-test 的 runTest、TestDispatcher 和 TestScheduler。生产代码通过构造函数注入 Dispatcher，测试中替换为 StandardTestDispatcher，再用 advanceUntilIdle 或 advanceTimeBy 推进虚拟时间。</div></div>
 
       <h3>源码级追问（面试加分题）</h3>
       <div class="qa"><button type="button">17. CoroutineContext 为什么用链表不用 HashMap？（源码题）</button><div class="answer"><strong>三原因：</strong>①数量级：协程 Context 通常 3-5 个 Element，O(n) 遍历开销可忽略；②内存：CombinedContext 每节点只存 left + element 两个引用，HashMap 需要初始化数组池；③不可变性：链表头部插入 O(1)，HashMap 不可变操作需全量复制。源码中 <code>CombinedContext.get(key)</code> 是一个 while 循环向左遍历，直到找到匹配 Key 的 Element 或到达链表尾部。</div></div>
