@@ -582,6 +582,7 @@ table tr:hover{background:rgba(101,215,196,.04)}
       </div>
       <div class="nav-section">
         <span class="nav-kicker">核心机制</span>
+        <a href="#source-map">源码阅读路线图</a>
         <a href="#suspend">suspend 与状态机</a>
         <a href="#suspend-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 状态机源码追踪</a>
         <a href="#context">Scope / Context / Dispatcher</a>
@@ -595,7 +596,6 @@ table tr:hover{background:rgba(101,215,196,.04)}
         <a href="#exceptions">异常处理体系</a>
         <a href="#exceptions-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 异常传播与CEH源码</a>
         <a href="#scheduler-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ CoroutineScheduler 源码</a>
-        <a href="#source-map">源码导读</a>
       </div>
       <div class="nav-section">
         <span class="nav-kicker">异步流</span>
@@ -862,6 +862,54 @@ table tr:hover{background:rgba(101,215,196,.04)}
       <span class="part-title">⚙️ 核心机制</span>
       <span class="part-sub">suspend · Context · 结构化并发 · 异常</span>
     </div>
+    <!-- ===== 源码阅读路线图 ===== -->
+    <section class="section" id="source-map">
+      <h2>源码阅读路线图：把这 11 个源码深潜串成一条线</h2>
+      <p class="lead">协程源码不可怕，可怕的是不知道从哪开始。下面是所有源码深潜章节的索引，标注了前置知识和阅读顺序——按表读比你随机翻源码快 3 倍。</p>
+      <div class="chapter">
+        <table>
+          <thead><tr><th>序号</th><th>源码章节</th><th>前置知识</th><th>回答什么问题</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><a href="#suspend-deep">状态机源码追踪</a></td><td>suspend 基础概念</td><td>编译器怎么把一个 suspend 函数拆成 label 结构？Continuation 怎么传递？</td></tr>
+            <tr><td>2</td><td><a href="#context-deep">Context 与 Dispatcher 架构</a></td><td>Scope/Context/Dispatcher 概念</td><td>CombinedContext 的链表为什么比 HashMap 快？Dispatcher 从哪切入协程？</td></tr>
+            <tr><td>3</td><td><a href="#scheduler-deep">CoroutineScheduler 工作窃取</a></td><td>Dispatcher 基础</td><td>Default 和 IO 共享什么线程池？IO 怎么弹性扩容？空闲 Worker 为什么去偷任务？</td></tr>
+            <tr><td>4</td><td><a href="#structured-deep">JobSupport 状态机</a></td><td>结构化并发概念</td><td>一个 AtomicReference 怎么同时存状态和子节点？取消怎么递归传播？</td></tr>
+            <tr><td>5</td><td><a href="#yield-deep">yield() 源码深潜</a></td><td>取消协作概念</td><td>yield 为什么不是 delay(0)？它和 Dispatcher 怎么配合让出线程？</td></tr>
+            <tr><td>6</td><td><a href="#abstractcoroutine-deep">AbstractCoroutine 生命周期</a></td><td>Job、协程构建器</td><td>launch 创建的对象怎么同时是 Job 和 Continuation？onStart/onCompleted/onCancelled 哪个先调？</td></tr>
+            <tr><td>7</td><td><a href="#exceptions-deep">childCancelled 与 CEH</a></td><td>异常处理体系</td><td>子异常怎么决定是否取消父？SupervisorJob 一行代码改了什么？CEH 从哪被查找？</td></tr>
+            <tr><td>8</td><td><a href="#flow-deep">SafeFlow 实现</a></td><td>Flow 冷流概念</td><td>flow {} 返回的 SafeFlow 怎么保证上下文安全？操作符链怎么用装饰器串起来？</td></tr>
+          </tbody>
+        </table>
+
+        <h3>推荐的 3 条阅读路径</h3>
+        <div class="grid two">
+          <article class="card">
+            <h3>路径 A：先懂调度，再懂生命周期</h3>
+            <p>适合想一次性把协程"怎么跑"和"怎么管理"串起来的人。</p>
+            <p><strong>顺序：</strong>1→2→3→4→6→7</p>
+            <p>先看懂状态机和调度器（底层的执行模型），再看 JobSupport（管理模型），逻辑自然衔接。</p>
+          </article>
+          <article class="card">
+            <h3>路径 B：先懂控制，再懂底层</h3>
+            <p>适合日常写协程遇到异常/取消问题最多的人——先看怎么控制，再看为什么。</p>
+            <p><strong>顺序：</strong>4→7→6→5→1→2→3</p>
+            <p>从结构化并发的取消和异常入手（最直接影响业务代码的部分），再逐步深入调度器。</p>
+          </article>
+          <article class="card">
+            <h3>路径 C：专注 Flow</h3>
+            <p>适合做数据层和 UI 状态管理的开发者——直奔 Flow 源码。</p>
+            <p><strong>顺序：</strong>8→2→3</p>
+            <p>先看 SafeFlow 和操作符链，再理解 flowOn 依赖的 Dispatcher 机制。</p>
+          </article>
+          <article class="card">
+            <h3>核心原则</h3>
+            <p><strong>每个章节先读开头的社会类比</strong>（在"类比破壁"区），建立直觉模型。<strong>然后去对应源码章节</strong>看代码拆解。<strong>最后回面试题库</strong>自测能否回答源码级追问。</p>
+          </article>
+        </div>
+        <div class="tip"><strong>读源码的黄金法则：</strong>用一段最小代码制造现象（如 <code>launch{delay(1000)}</code>），设断点，沿调用链只看 3-5 个关键类。不要试图从 <code>GlobalScope.launch</code> 通读全库。</div>
+      </div>
+    </section>
+
     <section class="section" id="suspend">
       <h2>suspend 与状态机：协程底层骨架</h2>
       <p class="lead"><code>suspend</code> 最容易被误解。它不代表“这个函数自动开线程”，也不代表“这个函数一定异步”。它只代表：这个函数可以在某个点暂停，并把后续执行封装成 Continuation。</p>
@@ -1841,64 +1889,7 @@ public fun handleCoroutineException(context: CoroutineContext, exception: Throwa
             <rect x="90" y="348" width="260" height="36" rx="6" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/>
             <text x="220" y="370" text-anchor="middle" fill="#173404" font-size="11">✓ CEH.handleException() 被调用</text>
             <rect x="430" y="348" width="260" height="36" rx="6" fill="#FCEBEB" stroke="#E24B4A" stroke-width="0.5"/>
-            <text x="560" y="370" text-anchor="middle" fill="#501313" font-size="11">✗ UncaughtExceptionHandler → crash</text>
-            <!-- 箭头 -->
-            <line x1="390" y1="96" x2="390" y2="118" stroke="#D85A30" stroke-width="2" marker-end="url(#ex)"/>
-            <line x1="390" y1="172" x2="390" y2="194" stroke="#D85A30" stroke-width="2" marker-end="url(#ex)"/>
-            <line x1="320" y1="236" x2="220" y2="268" stroke="#378ADD" stroke-width="1.5"/>
-            <line x1="460" y1="236" x2="560" y2="268" stroke="#378ADD" stroke-width="1.5"/>
-            <line x1="220" y1="322" x2="220" y2="346" stroke="#639922" stroke-width="1.5"/>
-            <line x1="560" y1="322" x2="560" y2="346" stroke="#E24B4A" stroke-width="1.5"/>
-          </svg>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="source-map">
-      <h2>源码导读：不要从文件开始读，要从问题开始读</h2>
-      <p class="lead">协程源码很容易越读越散。更有效的方式是带着问题进入源码：挂起如何恢复、调度器在哪里介入、Job 如何传播取消、Flow 如何保证上下文一致。</p>
-      <div class="grid two">
-        <article class="card">
-          <h3>问题 1：suspend 如何从“暂停”回到原位置？</h3>
-          <ul>
-            <li><code>Continuation</code>：恢复点抽象，核心方法是 <code>resumeWith</code>。</li>
-            <li><code>BaseContinuationImpl</code>：编译器状态机的基类，负责调用 <code>invokeSuspend</code>。</li>
-            <li><code>label</code> 字段：记录下一次恢复应该进入哪个分支。</li>
-          </ul>
-          <p><strong>读完应能：</strong>看懂“挂起不是线程暂停，而是函数返回；恢复不是从头执行，而是进入状态机下一段”。</p>
-        </article>
-        <article class="card">
-          <h3>问题 2：Dispatcher 在哪里切线程？</h3>
-          <ul>
-            <li><code>ContinuationInterceptor</code>：Context 里拦截 Continuation 的入口。</li>
-            <li><code>DispatchedContinuation</code>：把恢复动作包成可调度任务。</li>
-            <li><code>dispatch(context, block)</code>：真正把任务提交到目标线程或线程池。</li>
-          </ul>
-          <p><strong>读完应能：</strong>理解 <code>withContext</code> 和 <code>launch(Dispatchers.IO)</code> 并不是“代码魔法”，而是恢复点被调度器包装。</p>
-        </article>
-        <article class="card">
-          <h3>问题 3：取消和异常为什么会沿 Job 树传播？</h3>
-          <ul>
-            <li><code>JobSupport</code>：维护 Job 状态、完成回调、父子关系。</li>
-            <li><code>childCancelled</code>：子协程失败后，父协程是否被取消的关键路径。</li>
-            <li><code>SupervisorJob</code>：通过改变子失败处理策略，实现故障隔离。</li>
-          </ul>
-          <p><strong>读完应能：</strong>能解释普通 Job 和 SupervisorJob 的差异不是“try/catch 不同”，而是父子失败传播策略不同。</p>
-        </article>
-        <article class="card">
-          <h3>问题 4：Flow 如何保证上下文和顺序？</h3>
-          <ul>
-            <li><code>SafeCollector</code>：检查 emit 是否发生在合法上下文。</li>
-            <li><code>AbstractFlow.collect</code>：收集时包装 collector，并进入上游执行。</li>
-            <li><code>flowOn</code>：在上下游之间建立协程边界，通常伴随 channel 传递。</li>
-          </ul>
-          <p><strong>读完应能：</strong>能说明为什么 <code>catch</code> 只捕获上游、<code>flowOn</code> 只影响上游、<code>flow {}</code> 里乱切上下文会出问题。</p>
-        </article>
-      </div>
-      <div class="tip"><strong>读源码顺序建议：</strong>先用一段最小代码制造现象，再沿调用链看 3 到 5 个关键类。不要试图从协程库入口通读全库；那样很快会迷路。</div>
-    </section>
-
-    <!-- ===== Part 03 ===== -->
+            <text x="560" y="370" text-anchor="middle" fill="#501313" font-size="11">✗ UncaughtExceptionHandler → crash</text><!-- ===== Part 03 ===== -->
     <div class="part-divider">
       <span class="part-num">03</span>
       <span class="part-title">🌊 异步流</span>
