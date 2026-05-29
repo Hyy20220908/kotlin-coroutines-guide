@@ -844,6 +844,7 @@ table tr:hover{background:rgba(101,215,196,.04)}
           <p>异步数据流。冷流在 collect 时启动，热流独立存在并共享最新值或事件。</p>
         </article>
       </div>
+      <div class="tip"><strong>✅ 读后自检：</strong>① 不看目录，能说出协程核心概念的几个关键词吗？② Continuation 的两个核心职责是什么？③ Dispatcher 是"执行者"还是"调度策略"？</div>
       <div class="note"><strong>面试表达模板：</strong>协程是编译器、标准库和调度器配合实现的轻量级并发模型。编译器把 suspend 函数改写为状态机，标准库用 Continuation 表示恢复点，用 Job 维护结构化并发，用 Dispatcher 决定恢复线程。</div>
     </section>
 
@@ -1174,6 +1175,8 @@ class SimpleSuspendSM(
         api.fetchUser(id)
     }
 }</code></pre>
+      <div class="note"><strong>💬 作者注：</strong>我见过最多的协程面试翻车就是 Dispatcher 选错——在 Default 里调网络 API、在 Main 里解析大 JSON。记住一个原则：你不确定该用什么 Dispatcher 时，问自己"这段代码是在等别人(IO)，还是在算自己(CPU)"。</div>
+      <div class="tip"><strong>✅ 读后自检：</strong>① 你的项目里哪些地方在用 Dispatchers.IO？哪些该换 Default？② CombinedContext 的 + 操作是左边覆盖右边还是右边覆盖左边？③ Dispatchers.Unconfined 的生产代码风险是什么？</div>
       <div class="tip"><strong>架构建议：</strong>Repository 或 UseCase 内部自己切到合适 Dispatcher，让调用方不用关心底层是网络、数据库还是 CPU 计算。为了测试可控，Dispatcher 应该可注入。</div>
     </section>
 
@@ -1814,7 +1817,8 @@ fun trySteal(): Task? {
     }
     signalCpuWork()  // unpark 一个空闲 Worker
 }</code></pre>
-        <div class="warn"><strong>面试加分：</strong>Default 和 IO 的区别不是"不同的线程池"，而是<strong>调度策略不同</strong>——CPU 走本地队列+工作窃取(最小化上下文切换)，IO 走全局队列+弹性扩容(避免阻塞占满CPU线程)。IO 默认上限 64，由 <code>kotlinx.coroutines.io.parallelism</code> 控制。</div>
+        <div class="tip"><strong>🔙 回头看：</strong>学完核心机制后，你会发现自己看项目代码的眼光变了——以前看到 <code>viewModelScope.launch {}</code> 只觉得"启动了一个协程"，现在你能看到背后有 Continuation 状态机、Job 树、Dispatcher 调度、CoroutineScheduler 工作窃取。下次 code review 时试一下：随便挑一个 launch，在脑子里沿着调用链往下走三层——你会发现之前觉得"黑盒"的地方现在全亮了。</div>
+      <div class="warn"><strong>面试加分：</strong>Default 和 IO 的区别不是"不同的线程池"，而是<strong>调度策略不同</strong>——CPU 走本地队列+工作窃取(最小化上下文切换)，IO 走全局队列+弹性扩容(避免阻塞占满CPU线程)。IO 默认上限 64，由 <code>kotlinx.coroutines.io.parallelism</code> 控制。</div>
       </div>
     </section>
 
@@ -2417,7 +2421,8 @@ val result: ChannelResult&lt;T&gt; = channel.receiveCatching()
 result.onSuccess {  }   // 正常值
       .onFailure {  }   // Channel 已关闭
       .onClosed {  }    // 关闭原因</code></pre>
-        <div class="warn"><strong>Channel 泄漏：</strong>如果生产者忘记 close()，消费者的 for 循环永远不退出。produce 构建器的协程取消时自动 close，更适合生产消费场景。</div>
+        <div class="tip"><strong>✅ 读后自检：</strong>① RENDEZVOUS 和 UNLIMITED 在生产者先 emit 时行为有什么不同？② produce {} 和普通的 Channel 创建有什么区别？③ 什么场景用 Channel 比 Flow 更合适？</div>
+      <div class="warn"><strong>Channel 泄漏：</strong>如果生产者忘记 close()，消费者的 for 循环永远不退出。produce 构建器的协程取消时自动 close，更适合生产消费场景。</div>
       </div>
     </section>
 
@@ -3335,7 +3340,8 @@ val events: SharedFlow&lt;Event&gt; = eventFlow
     }
 }
 job.cancel()</code></pre>
-        <p>取消是协作式，不是抢占式。这个循环没有挂起点，也没有检查取消状态，所以可能持续运行。修复方式是在循环中使用 <code>ensureActive()</code>、<code>yield()</code> 或检查 <code>isActive</code>。</p>
+      <div class="tip"><strong>✅ 读后自检：</strong>① 用你自己的话解释 coroutineScope 和 supervisorScope 的行为差异。② 如果一个 CPU 密集型 while 循环不检查 isActive，cancel() 对它有效吗？③ 父协程被取消后，它的子协程会怎样？</div>
+       <p>取消是协作式，不是抢占式。这个循环没有挂起点，也没有检查取消状态，所以可能持续运行。修复方式是在循环中使用 <code>ensureActive()</code>、<code>yield()</code> 或检查 <code>isActive</code>。</p>
       </div></div>
       <div class="qa"><button type="button">练习 3：这段异常处理有什么问题？</button><div class="answer">
 <pre><code class="language-kotlin">try {
