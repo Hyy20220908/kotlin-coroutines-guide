@@ -170,6 +170,44 @@ button,input{font:inherit}
 .stat:last-child{border-right:0}
 .stat strong{display:block;font-size:20px}
 .stat span{color:var(--subtle);font-size:12px}
+
+/* --- 分区隔断 --- */
+.part-divider{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin:0;
+  padding:16px clamp(20px,5vw,72px);
+  background:linear-gradient(90deg,rgba(101,215,196,.06),transparent);
+  border-bottom:1px solid var(--line-soft);
+  border-top:1px solid var(--line-soft);
+}
+.part-divider .part-num{
+  width:32px;height:32px;
+  display:grid;place-items:center;
+  background:rgba(101,215,196,.13);
+  color:var(--accent);
+  border-radius:6px;
+  font-size:13px;font-weight:800;
+}
+.part-divider .part-title{
+  font-size:14px;font-weight:800;
+  color:var(--accent);
+  letter-spacing:.04em;
+}
+.part-divider .part-sub{
+  color:var(--subtle);
+  font-size:12px;
+  margin-left:auto;
+}
+/* 导航栏分组间距 */
+.nav-group-spacer{
+  height:1px;
+  margin:10px 0;
+  background:linear-gradient(90deg,transparent,var(--line),transparent);
+  opacity:.5;
+}
+
 .section{
   padding:58px clamp(20px,5vw,72px);
   border-bottom:1px solid var(--line-soft);
@@ -632,6 +670,12 @@ table tr:hover{background:rgba(101,215,196,.04)}
       </div>
     </section>
 
+    <!-- ===== Part 01 ===== -->
+    <div class="part-divider">
+      <span class="part-num">01</span>
+      <span class="part-title">📖 入门准备</span>
+      <span class="part-sub">路线 · 类比 · 知识地图</span>
+    </div>
     <section class="section" id="roadmap">
       <h2>学习路线：先会用，再讲透，最后能排坑</h2>
       <p class="lead">很多人学协程会卡在两个极端：只背 API，遇到异常和取消就崩；一上来啃源码，缺少 Android 使用场景。建议按下面顺序推进。</p>
@@ -810,6 +854,12 @@ table tr:hover{background:rgba(101,215,196,.04)}
       <div class="tip"><strong>怎么用这个专区：</strong>遇到某个概念读不懂时，先回来看对应的类比。脑中有生活场景，再去看技术定义，会发现"哦原来就是这个意思"。</div>
     </section>
 
+    <!-- ===== Part 02 ===== -->
+    <div class="part-divider">
+      <span class="part-num">02</span>
+      <span class="part-title">⚙️ 核心机制</span>
+      <span class="part-sub">suspend · Context · 结构化并发 · 异常</span>
+    </div>
     <section class="section" id="suspend">
       <h2>suspend 与状态机：协程底层骨架</h2>
       <p class="lead"><code>suspend</code> 最容易被误解。它不代表“这个函数自动开线程”，也不代表“这个函数一定异步”。它只代表：这个函数可以在某个点暂停，并把后续执行封装成 Continuation。</p>
@@ -1738,6 +1788,12 @@ public fun handleCoroutineException(context: CoroutineContext, exception: Throwa
       <div class="tip"><strong>读源码顺序建议：</strong>先用一段最小代码制造现象，再沿调用链看 3 到 5 个关键类。不要试图从协程库入口通读全库；那样很快会迷路。</div>
     </section>
 
+    <!-- ===== Part 03 ===== -->
+    <div class="part-divider">
+      <span class="part-num">03</span>
+      <span class="part-title">🌊 异步流</span>
+      <span class="part-sub">Flow · StateFlow · Channel</span>
+    </div>
     <section class="section" id="flow">
       <h2>Flow：冷流、操作符链和 flowOn</h2>
       <p class="lead">Flow 是协程世界里的异步数据流。它的难点不是 API 名字，而是“谁触发生产、谁在哪个线程执行、异常从哪里被 catch”。</p>
@@ -2210,6 +2266,12 @@ result.onSuccess {  }   // 正常值
       </div>
     </section>
 
+    <!-- ===== Part 04 ===== -->
+    <div class="part-divider">
+      <span class="part-num">04</span>
+      <span class="part-title">🤖 Android 实战</span>
+      <span class="part-sub">架构 · 场景 · 测试 · Compose</span>
+    </div>
     <section class="section" id="android">
       <h2>Android 落地架构：让协程待在正确的层</h2>
       <p class="lead">稳定的协程代码不是“哪里都 launch 一下”，而是每一层只承担自己的职责。</p>
@@ -2740,6 +2802,12 @@ fun SearchBar(viewModel: SearchViewModel) {
       </div>
     </section>
 
+    <!-- ===== Part 05 ===== -->
+    <div class="part-divider">
+      <span class="part-num">05</span>
+      <span class="part-title">🚀 进阶专题</span>
+      <span class="part-sub">Select · 启动模式 · 迁移</span>
+    </div>
     <!-- ===== 新增：Select 表达式 ===== -->
     <section class="section" id="select">
       <h2>Select 表达式：谁先完成用谁</h2>
@@ -2959,6 +3027,12 @@ val events: SharedFlow&lt;Event&gt; = eventFlow
       <div class="tip"><strong>渐进迁移策略：</strong>不要在项目里同时维护 RxJava 和协程的双轨。先统一 Repository 层换成 suspend/Flow，ViewModel + UI 继续用 Rx（通过 asFlow() 桥接）。等 Repository 全部迁移完，再把 ViewModel 切换到协程。</div>
     </section>
 
+    <!-- ===== Part 06 ===== -->
+    <div class="part-divider">
+      <span class="part-num">06</span>
+      <span class="part-title">🎯 面试冲刺</span>
+      <span class="part-sub">题库 · 追问训练 · 速查</span>
+    </div>
     <section class="section" id="exercise-lab">
       <h2>练习题：看懂不算会，能判断结果才算稳</h2>
       <p class="lead">下面这些题适合读完对应章节后自测。不要急着展开答案，先说出现象，再说底层原因，最后给出修复方案。</p>
@@ -3154,6 +3228,12 @@ class MyActivity : AppCompatActivity() {
       </div>
     </section>
 
+    <!-- ===== Part 07 ===== -->
+    <div class="part-divider">
+      <span class="part-num">07</span>
+      <span class="part-title">📚 速查参考</span>
+      <span class="part-sub">决策树 · 速查卡片</span>
+    </div>
     <!-- ===== 决策树 ===== -->
     <section class="section" id="decision-tree">
       <h2>速查决策树：给你场景，直接告诉你怎么写</h2>
