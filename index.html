@@ -572,16 +572,16 @@ table tr:hover{background:rgba(101,215,196,.04)}
       <div class="brand-title">Kotlin 协程深度指南 <span>Android 实战与面试路线</span></div>
     </div>
     <input class="search" id="search" placeholder="搜索 suspend / Flow / 面试题">
-    <nav class="nav" aria-label="页面导航">
+        <nav class="nav" aria-label="页面导航">
       <div class="nav-section">
-        <span class="nav-kicker">Start</span>
+        <span class="nav-kicker">入门准备</span>
         <a href="#roadmap">学习路线</a>
         <a href="#why-coroutines">为什么需要协程</a>
         <a href="#knowledge-map">协程知识地图</a>
-        <a href="#analogies">⛶ 类比破壁 (通俗直译)</a>
+        <a href="#analogies">类比破壁</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Core</span>
+        <span class="nav-kicker">核心机制</span>
         <a href="#suspend">suspend 与状态机</a>
         <a href="#suspend-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 状态机源码追踪</a>
         <a href="#context">Scope / Context / Dispatcher</a>
@@ -590,45 +590,44 @@ table tr:hover{background:rgba(101,215,196,.04)}
         <a href="#builder-compare" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 构建器完全对比</a>
         <a href="#structured">结构化并发与取消</a>
         <a href="#structured-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ JobSupport 源码追踪</a>
+        <a href="#yield-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ yield() 源码深潜</a>
+        <a href="#abstractcoroutine-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ AbstractCoroutine 源码</a>
         <a href="#exceptions">异常处理体系</a>
         <a href="#exceptions-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 异常传播与CEH源码</a>
         <a href="#source-map">源码导读</a>
-        <a href="#yield-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ yield() 源码深潜</a>
-        <a href="#abstractcoroutine-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ AbstractCoroutine 源码</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Flow</span>
+        <span class="nav-kicker">异步流</span>
         <a href="#flow">Flow 冷流与热流</a>
         <a href="#flow-deep" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ SafeFlow 源码追踪</a>
-        <a href="#flow-operators" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 操作符速查 (9类)</a>
+        <a href="#flow-operators" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 操作符速查</a>
         <a href="#flow-advanced" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ flatMap/背压/channelFlow</a>
         <a href="#stateflow">StateFlow / SharedFlow</a>
         <a href="#channel">Channel 协程通信</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Android</span>
+        <span class="nav-kicker">Android 实战</span>
         <a href="#android">Android 落地架构</a>
         <a href="#case-lab">场景实验室</a>
         <a href="#testing">测试与调试</a>
-        <a href="#anti-patterns" style="padding-left:22px;font-size:11px;color:var(--subtle)">↳ 反模式集与踩坑实录</a>
-        <a href="#performance">性能与反模式</a>
+        <a href="#anti-patterns">反模式与性能优化</a>
         <a href="#compose">Compose + 协程集成</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Advanced</span>
+        <span class="nav-kicker">进阶专题</span>
         <a href="#select">Select 表达式</a>
         <a href="#coroutine-start">CoroutineStart 模式</a>
-        <a href="#advanced-api">进阶 API (withTimeout/Mutex/callbackFlow)</a>
-        <a href="#rxjava-migration">RxJava → 协程迁移</a>
+        <a href="#advanced-api">进阶 API</a>
+        <a href="#rxjava-migration">RxJava 迁移</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Interview</span>
+        <span class="nav-kicker">面试冲刺</span>
         <a href="#exercise-lab">练习题</a>
         <a href="#interview">大厂面试题库</a>
         <a href="#interview-drill">追问训练</a>
       </div>
       <div class="nav-section">
-        <span class="nav-kicker">Reference</span>
+        <span class="nav-kicker">速查参考</span>
         <a href="#decision-tree">速查决策树</a>
         <a href="#cheatsheet">协程速查卡片</a>
       </div>
@@ -1191,7 +1190,7 @@ class DispatchedContinuation&lt;T&gt;(
     </section>
 
     <!-- ===== CoroutineContext Element 完整清单 ===== -->
-    <section class="section source-deep" id="context-elements">
+    <section class="section" id="context-elements">
       <h2>CoroutineContext Element 完整清单</h2>
       <p class="lead">Context 的 <code>+</code> 操作让你组合各种 Element。下面列出所有标准库中的 Element，以及每个 Element 的 Key 和作用域。</p>
       <table>
@@ -1210,7 +1209,7 @@ class DispatchedContinuation&lt;T&gt;(
     </section>
 
     <!-- ===== 协程构建器完整对比 ===== -->
-    <section class="section source-deep" id="builder-compare">
+    <section class="section" id="builder-compare">
       <h2>所有协程构建器 / Scope 函数一表对比</h2>
       <p class="lead">面试里最容易搞混的就是"这个构建器到底会不会等子协程""异常怎么走""返回什么"。一张表全理清。</p>
       <table>
@@ -1901,7 +1900,7 @@ override var value: T
     </section>
 
     <!-- ===== Flow 操作符速查 ===== -->
-    <section class="section source-deep" id="flow-operators">
+    <section class="section" id="flow-operators">
       <h2>Flow 操作符速查：需要什么功能，找哪个操作符</h2>
       <div class="chapter">
         <div class="grid three">
@@ -2550,7 +2549,7 @@ fun loadData_cancellationNotTreatedAsError() = runTest {
     </section>
 
     <!-- ===== 反模式集与踩坑实录 ===== -->
-    <section class="section source-deep" id="anti-patterns">
+    <section class="section" id="anti-patterns">
       <h2>反模式集：这些代码能跑，但一定会出问题</h2>
       <p class="lead">协程最隐蔽的坑不是 crash，而是能跑但慢慢泄漏、偶尔卡顿、异常静默消失。</p>
       <div class="chapter">
@@ -2867,9 +2866,9 @@ suspend fun consumeMulti(ch1: ReceiveChannel&lt;Int&gt;, ch2: ReceiveChannel&lt;
       </div>
     </section>
 
-    <!-- ===== 新增：CoroutineStart 六种模式 ===== -->
+    <!-- ===== 新增：CoroutineStart 四种模式 ===== -->
     <section class="section" id="coroutine-start">
-      <h2>CoroutineStart 六种模式：控制协程的启动时机</h2>
+      <h2>CoroutineStart 四种模式：控制协程的启动时机</h2>
       <p class="lead">99% 的场景用默认的 <code>DEFAULT</code> 就够了，但当你需要"懒加载协程"或"在启动的线程先执行一段"时，另外几种 Start 模式是关键。</p>
       <div class="chapter">
         <table>
